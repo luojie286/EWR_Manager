@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import AppTheme 1.0
+import "../components"
 
 Rectangle {
     id: root
@@ -13,25 +14,51 @@ Rectangle {
     signal deleteRequested()
 
     width: parent ? parent.width : 400
-    height: contentColumn.implicitHeight + 24
+    height: contentColumn.implicitHeight + 28
     radius: Theme.radius
-    color: Theme.surface
-    border.color: Theme.border
+    color: reviewMouse.containsMouse ? Theme.surfaceElevated : Theme.surface
+    border.color: reviewMouse.containsMouse ? Theme.accent : Theme.border
     border.width: 1
+
+    Behavior on color { ColorAnimation { duration: 120 } }
+    Behavior on border.color { ColorAnimation { duration: 120 } }
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 4
+        radius: 2
+        color: Theme.accent
+        opacity: reviewMouse.containsMouse ? 0.9 : 0.45
+    }
 
     ColumnLayout {
         id: contentColumn
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 6
+        anchors.leftMargin: 16
+        anchors.rightMargin: 12
+        anchors.topMargin: 14
+        anchors.bottomMargin: 14
+        spacing: 8
 
         RowLayout {
             Layout.fillWidth: true
+            spacing: 10
 
-            Label {
-                text: date
-                font: Theme.captionFont
-                color: Theme.textSecondary
+            Rectangle {
+                Layout.preferredWidth: dateLabel.implicitWidth + 16
+                Layout.preferredHeight: 24
+                radius: 12
+                color: Theme.backgroundAlt
+
+                Label {
+                    id: dateLabel
+                    anchors.centerIn: parent
+                    text: date
+                    font: Theme.labelFont
+                    color: Theme.textMuted
+                }
             }
 
             Label {
@@ -42,9 +69,25 @@ Rectangle {
                 elide: Text.ElideRight
             }
 
-            ToolButton {
-                text: "🗑"
-                onClicked: root.deleteRequested()
+            Rectangle {
+                width: 32
+                height: 32
+                radius: 16
+                color: deleteMouse.containsMouse ? "#3d1f1f" : "transparent"
+
+                Icon {
+                    anchors.centerIn: parent
+                    iconSource: "trash-2"
+                    size: Theme.iconSizeSmall
+                    iconOpacity: deleteMouse.containsMouse ? 1.0 : 0.45
+                }
+
+                MouseArea {
+                    id: deleteMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: root.deleteRequested()
+                }
             }
         }
 
@@ -60,7 +103,10 @@ Rectangle {
     }
 
     MouseArea {
+        id: reviewMouse
         anchors.fill: parent
+        hoverEnabled: true
+        z: -1
         onClicked: root.clicked()
     }
 }

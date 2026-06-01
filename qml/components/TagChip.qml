@@ -7,31 +7,31 @@ Rectangle {
     property string tagName: ""
     property bool selected: false
     property bool removable: false
-
     property bool compact: false
 
     signal clicked()
     signal removeRequested()
 
-    height: compact ? 22 : 28
-    width: tagText.width + (removable ? 36 : (compact ? 20 : 24))
+    height: compact ? 24 : 30
+    width: tagText.width + (removable ? 36 : (compact ? 18 : 22))
     radius: height / 2
-    color: selected ? Theme.accentSoft : Theme.surface
+    color: selected ? Theme.accentMuted : Theme.surfaceElevated
     border.color: selected ? Theme.accent : Theme.border
     border.width: 1
 
     Text {
         id: tagText
         anchors.left: parent.left
-        anchors.leftMargin: compact ? 8 : 12
+        anchors.leftMargin: compact ? 9 : 12
         anchors.verticalCenter: parent.verticalCenter
         text: tagName
         font: Theme.captionFont
-        color: selected ? Theme.textPrimary : Theme.textSecondary
+        color: selected ? Theme.accentHover : Theme.textSecondary
     }
 
     MouseArea {
         anchors.fill: parent
+        hoverEnabled: true
         onClicked: root.clicked()
     }
 

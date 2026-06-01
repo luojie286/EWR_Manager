@@ -1,8 +1,26 @@
 <RCC>
     <qresource prefix="/">
+        <file alias="icons/app-icon.svg">resources/icons/app-icon.svg</file>
+        <file alias="icons/house.svg">resources/icons/house.svg</file>
+        <file alias="icons/search.svg">resources/icons/search.svg</file>
+        <file alias="icons/chart-column.svg">resources/icons/chart-column.svg</file>
+        <file alias="icons/plus.svg">resources/icons/plus.svg</file>
+        <file alias="icons/pencil.svg">resources/icons/pencil.svg</file>
+        <file alias="icons/trash-2.svg">resources/icons/trash-2.svg</file>
+        <file alias="icons/star.svg">resources/icons/star.svg</file>
+        <file alias="icons/arrow-left.svg">resources/icons/arrow-left.svg</file>
+        <file alias="icons/book-open.svg">resources/icons/book-open.svg</file>
+        <file alias="icons/film.svg">resources/icons/film.svg</file>
+        <file alias="icons/tag.svg">resources/icons/tag.svg</file>
+        <file alias="icons/sparkles.svg">resources/icons/sparkles.svg</file>
+        <file alias="icons/inbox.svg">resources/icons/inbox.svg</file>
+        <file alias="icons/save.svg">resources/icons/save.svg</file>
+        <file alias="icons/pen-line.svg">resources/icons/pen-line.svg</file>
         <file>qml/main.qml</file>
         <file>qml/AppTheme/Theme.qml</file>
         <file>qml/AppTheme/qmldir</file>
+        <file>qml/components/Icon.qml</file>
+        <file>qml/components/EmptyState.qml</file>
         <file>qml/components/AnimeCard.qml</file>
         <file>qml/components/TagChip.qml</file>
         <file>qml/components/ReviewItem.qml</file>

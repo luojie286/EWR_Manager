@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Network Qml Quick Sql QuickControls2 QuickDialogs2)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Network Qml Quick Sql QuickControls2 QuickDialogs2 Svg)
 
 qt_add_executable(EWR_Manager
     src/main.cpp
@@ -30,6 +30,7 @@ target_link_libraries(EWR_Manager PRIVATE
     Qt6::Sql
     Qt6::QuickControls2
     Qt6::QuickDialogs2
+    Qt6::Svg
 )
 
 if(WIN32)

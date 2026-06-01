@@ -71,31 +71,46 @@ Item {
                     spacing: Theme.spacing
 
                     Rectangle {
-                        Layout.preferredWidth: 220
-                        Layout.preferredHeight: 320
-                        radius: Theme.radius
-                        color: Theme.surface
+                        Layout.preferredWidth: 240
+                        Layout.preferredHeight: 340
+                        radius: Theme.radiusLarge
+                        color: Theme.surfaceHover
                         clip: true
+                        border.color: Theme.borderLight
+                        border.width: 1
 
                         Image {
+                            id: detailCover
                             anchors.fill: parent
+                            anchors.margins: 1
                             source: anime.coverPath ? "file:///" + anime.coverPath.replace(/\\/g, "/") : ""
-                            fillMode: Image.PreserveAspectCrop
-                            visible: status === Image.Ready
+                            fillMode: Image.PreserveAspectFit
+                            horizontalAlignment: Image.AlignHCenter
+                            verticalAlignment: Image.AlignVCenter
+                            visible: detailCover.status === Image.Ready
                         }
 
-                        Label {
-                            anchors.centerIn: parent
-                            visible: !anime.coverPath
-                            text: anime.title ? anime.title.charAt(0) : "?"
-                            font.pixelSize: 72
-                            color: Theme.accent
+                        Rectangle {
+                            anchors.fill: parent
+                            visible: !anime.coverPath || detailCover.status !== Image.Ready
+                            gradient: Gradient {
+                                orientation: Gradient.Vertical
+                                GradientStop { position: 0.0; color: Theme.accentMuted }
+                                GradientStop { position: 1.0; color: Theme.surfaceHover }
+                            }
+
+                            Icon {
+                                anchors.centerIn: parent
+                                iconSource: "film"
+                                size: 56
+                                iconOpacity: 0.3
+                            }
                         }
                     }
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 12
+                        spacing: 14
 
                         Label {
                             text: anime.title || ""
@@ -106,31 +121,67 @@ Item {
                         }
 
                         RowLayout {
-                            spacing: 16
+                            spacing: 10
 
-                            Label {
-                                text: qsTr("评分：%1").arg(anime.score > 0 ? anime.score.toFixed(1) : "—")
-                                font: Theme.headingFont
-                                color: Theme.warning
+                            Rectangle {
+                                implicitWidth: scoreRow.implicitWidth + 20
+                                implicitHeight: 34
+                                radius: 17
+                                color: Theme.backgroundAlt
+                                border.color: Theme.border
+                                border.width: 1
+
+                                RowLayout {
+                                    id: scoreRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    Icon {
+                                        iconSource: "star"
+                                        size: Theme.iconSizeSmall
+                                    }
+
+                                    Label {
+                                        text: anime.score > 0 ? anime.score.toFixed(1) : "—"
+                                        font: Theme.headingFont
+                                        color: Theme.warning
+                                    }
+                                }
                             }
 
                             Rectangle {
-                                width: 1
-                                height: 20
-                                color: Theme.border
+                                implicitWidth: statusChip.implicitWidth + 20
+                                implicitHeight: 34
+                                radius: 17
+                                color: Theme.statusBgColor(anime.status || "未看")
+                                border.color: Theme.statusColor(anime.status || "未看")
+                                border.width: 1
+
+                                Label {
+                                    id: statusChip
+                                    anchors.centerIn: parent
+                                    text: anime.status || "未看"
+                                    font: Theme.bodyFont
+                                    color: Theme.statusColor(anime.status || "未看")
+                                }
                             }
 
-                            Label {
-                                text: qsTr("状态：%1").arg(anime.status || "未看")
-                                font: Theme.bodyFont
-                                color: Theme.textPrimary
-                            }
-
-                            Label {
+                            Rectangle {
                                 visible: (anime.bgmId || 0) > 0
-                                text: qsTr("BGM #%1").arg(anime.bgmId)
-                                font: Theme.captionFont
-                                color: Theme.accent
+                                implicitWidth: bgmChip.implicitWidth + 20
+                                implicitHeight: 34
+                                radius: 17
+                                color: Theme.accentMuted
+                                border.color: Theme.accent
+                                border.width: 1
+
+                                Label {
+                                    id: bgmChip
+                                    anchors.centerIn: parent
+                                    text: qsTr("BGM #%1").arg(anime.bgmId)
+                                    font: Theme.captionFont
+                                    color: Theme.accentHover
+                                }
                             }
                         }
 
@@ -143,18 +194,34 @@ Item {
                             }
                         }
 
-                        Label {
-                            text: qsTr("简介")
-                            font: Theme.headingFont
-                            color: Theme.textPrimary
-                        }
-
-                        Label {
-                            text: anime.description || qsTr("暂无简介")
-                            font: Theme.bodyFont
-                            color: Theme.textSecondary
-                            wrapMode: Text.WordWrap
+                        Rectangle {
                             Layout.fillWidth: true
+                            Layout.preferredHeight: descColumn.implicitHeight + 24
+                            radius: Theme.radius
+                            color: Theme.surface
+                            border.color: Theme.borderLight
+                            border.width: 1
+
+                            ColumnLayout {
+                                id: descColumn
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                spacing: 8
+
+                                Label {
+                                    text: qsTr("简介")
+                                    font: Theme.headingFont
+                                    color: Theme.textPrimary
+                                }
+
+                                Label {
+                                    text: anime.description || qsTr("暂无简介")
+                                    font: Theme.bodyFont
+                                    color: Theme.textSecondary
+                                    wrapMode: Text.WordWrap
+                                    Layout.fillWidth: true
+                                }
+                            }
                         }
                     }
                 }

@@ -96,17 +96,19 @@ Item {
 
                     Rectangle {
                         Layout.preferredWidth: 160
-                        Layout.preferredHeight: 220
+                        Layout.preferredHeight: 240
                         radius: Theme.radius
-                        color: Theme.surface
+                        color: "#0a0c10"
                         clip: true
 
                         Image {
                             id: coverPreview
                             anchors.fill: parent
                             source: coverPathField.text ? "file:///" + coverPathField.text.replace(/\\/g, "/") : ""
-                            fillMode: Image.PreserveAspectCrop
-                            visible: status === Image.Ready
+                            fillMode: Image.PreserveAspectFit
+                            horizontalAlignment: Image.AlignHCenter
+                            verticalAlignment: Image.AlignVCenter
+                            visible: coverPreview.status === Image.Ready
                         }
 
                         Label {

@@ -7,8 +7,10 @@ import "pages"
 
 ApplicationWindow {
     id: root
-    width: 1200
-    height: 800
+    width: 1280
+    height: 840
+    minimumWidth: 960
+    minimumHeight: 640
     visible: true
     title: qsTr("EWR_Manager")
     color: Theme.background
@@ -16,26 +18,94 @@ ApplicationWindow {
     property var currentAnime: ({})
     property var currentReview: ({})
 
+    background: Item {
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Theme.background }
+                GradientStop { position: 0.45; color: Theme.backgroundAlt }
+                GradientStop { position: 1.0; color: "#0d1018" }
+            }
+        }
+
+        Rectangle {
+            width: 520
+            height: 520
+            x: -180
+            y: -120
+            radius: width / 2
+            color: Theme.accent
+            opacity: 0.06
+        }
+
+        Rectangle {
+            width: 420
+            height: 420
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.rightMargin: -100
+            anchors.bottomMargin: -80
+            radius: width / 2
+            color: "#5b8def"
+            opacity: 0.05
+        }
+    }
+
     header: Rectangle {
-        height: 64
+        height: Theme.headerHeight
         color: Theme.surface
+        border.color: Theme.borderLight
+        border.width: 1
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Theme.spacing
+            anchors.leftMargin: Theme.spacing + 4
             anchors.rightMargin: Theme.spacing
             spacing: Theme.spacing
 
-            Label {
-                text: qsTr("EWR_Manager")
-                font: Theme.titleFont
-                color: Theme.textPrimary
+            RowLayout {
+                spacing: 12
+
+                Rectangle {
+                    width: 42
+                    height: 42
+                    radius: 12
+                    gradient: Gradient {
+                        orientation: Gradient.Vertical
+                        GradientStop { position: 0.0; color: Theme.accentHover }
+                        GradientStop { position: 1.0; color: Theme.accent }
+                    }
+
+                    Icon {
+                        anchors.centerIn: parent
+                        iconSource: "book-open"
+                        size: 22
+                        iconOpacity: 0.95
+                    }
+                }
+
+                ColumnLayout {
+                    spacing: 0
+
+                    Label {
+                        text: qsTr("EWR_Manager")
+                        font: Theme.titleFont
+                        color: Theme.textPrimary
+                    }
+
+                    Label {
+                        text: qsTr("娱乐作品感想管理")
+                        font: Theme.labelFont
+                        color: Theme.textMuted
+                    }
+                }
             }
 
             Item { Layout.fillWidth: true }
 
             NavButton {
                 text: qsTr("首页")
+                iconSource: "house"
                 active: stackView.depth <= 1
                 onClicked: {
                     while (stackView.depth > 1)
@@ -45,22 +115,44 @@ ApplicationWindow {
 
             NavButton {
                 text: qsTr("统计")
+                iconSource: "chart-column"
                 active: stackView.currentItem && stackView.currentItem.objectName === "StatisticsPage"
                 onClicked: stackView.push(statisticsPageComponent)
             }
 
             Button {
-                text: qsTr("+ 添加作品")
+                id: addButton
+                text: qsTr("添加作品")
                 highlighted: true
+                font: Theme.bodyFont
                 onClicked: stackView.push(editPageComponent, { animeId: 0 })
-            }
-        }
 
-        Rectangle {
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: 1
-            color: Theme.border
+                contentItem: RowLayout {
+                    spacing: 8
+
+                    Icon {
+                        iconSource: "plus"
+                        size: Theme.iconSizeSmall
+                        iconOpacity: 0.95
+                    }
+
+                    Text {
+                        text: addButton.text
+                        font: addButton.font
+                        color: "#ffffff"
+                    }
+                }
+
+                background: Rectangle {
+                    radius: Theme.radius
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: addButton.down ? Theme.accent : Theme.accentHover }
+                        GradientStop { position: 1.0; color: Theme.accent }
+                    }
+                    opacity: addButton.enabled ? 1.0 : 0.45
+                }
+            }
         }
     }
 
@@ -71,12 +163,12 @@ ApplicationWindow {
         initialItem: homePageComponent
 
         pushEnter: Transition {
-            PropertyAnimation { property: "opacity"; from: 0; to: 1; duration: 180 }
-            PropertyAnimation { property: "x"; from: 40; to: 0; duration: 180; easing.type: Easing.OutCubic }
+            PropertyAnimation { property: "opacity"; from: 0; to: 1; duration: 200; easing.type: Easing.OutCubic }
+            PropertyAnimation { property: "x"; from: 32; to: 0; duration: 220; easing.type: Easing.OutCubic }
         }
         popExit: Transition {
-            PropertyAnimation { property: "opacity"; from: 1; to: 0; duration: 150 }
-            PropertyAnimation { property: "x"; from: 0; to: 40; duration: 150; easing.type: Easing.InCubic }
+            PropertyAnimation { property: "opacity"; from: 1; to: 0; duration: 160; easing.type: Easing.InCubic }
+            PropertyAnimation { property: "x"; from: 0; to: 24; duration: 160; easing.type: Easing.InCubic }
         }
     }
 

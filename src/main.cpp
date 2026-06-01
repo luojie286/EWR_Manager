@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("EWR_Manager"));
     app.setOrganizationName(QStringLiteral("Personal"));
     app.setOrganizationDomain(QStringLiteral("local"));
+    app.setWindowIcon(QIcon(QStringLiteral(":/icons/app-icon.svg")));
 
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 

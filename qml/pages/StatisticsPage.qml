@@ -21,7 +21,7 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 0
+        spacing: Theme.spacing
 
         PageBackBar {
             Layout.fillWidth: true
@@ -45,49 +45,65 @@ Item {
                 width: root.width
                 spacing: Theme.spacing
 
-                Item { Layout.preferredHeight: 4 }
-
                 GridLayout {
                     Layout.fillWidth: true
-                    Layout.leftMargin: Theme.spacing
-                    Layout.rightMargin: Theme.spacing
                     columns: 3
                     rowSpacing: Theme.spacing
                     columnSpacing: Theme.spacing
 
                     Repeater {
                         model: [
-                            { label: qsTr("总作品数"), value: stats.totalCount, color: Theme.accent },
-                            { label: qsTr("已看完"), value: stats.finishedCount, color: Theme.success },
-                            { label: qsTr("在看"), value: stats.watchingCount, color: Theme.warning },
-                            { label: qsTr("未看"), value: stats.plannedCount, color: Theme.textSecondary },
-                            { label: qsTr("弃坑"), value: stats.droppedCount, color: Theme.danger },
-                            { label: qsTr("平均评分"), value: stats.averageScore, color: Theme.warning }
+                            { label: qsTr("总作品数"), value: stats.totalCount, color: Theme.accent, icon: "book-open" },
+                            { label: qsTr("已看完"), value: stats.finishedCount, color: Theme.success, icon: "star" },
+                            { label: qsTr("在看"), value: stats.watchingCount, color: Theme.warning, icon: "film" },
+                            { label: qsTr("未看"), value: stats.plannedCount, color: Theme.textSecondary, icon: "inbox" },
+                            { label: qsTr("弃坑"), value: stats.droppedCount, color: Theme.danger, icon: "trash-2" },
+                            { label: qsTr("平均评分"), value: stats.averageScore, color: Theme.warning, icon: "chart-column" }
                         ]
 
                         delegate: Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 100
-                            radius: Theme.radius
+                            Layout.preferredHeight: 118
+                            radius: Theme.radiusLarge
                             color: Theme.surface
-                            border.color: Theme.border
+                            border.color: Theme.borderLight
+                            border.width: 1
 
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 8
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 14
 
-                                Label {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: modelData.label
-                                    font: Theme.captionFont
-                                    color: Theme.textSecondary
+                                Rectangle {
+                                    Layout.preferredWidth: 48
+                                    Layout.preferredHeight: 48
+                                    radius: 14
+                                    color: Theme.backgroundAlt
+                                    border.color: Theme.border
+                                    border.width: 1
+
+                                    Icon {
+                                        anchors.centerIn: parent
+                                        iconSource: modelData.icon
+                                        size: 22
+                                    }
                                 }
 
-                                Label {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: modelData.value
-                                    font: Theme.titleFont
-                                    color: modelData.color
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+
+                                    Label {
+                                        text: modelData.label
+                                        font: Theme.captionFont
+                                        color: Theme.textSecondary
+                                    }
+
+                                    Label {
+                                        text: modelData.value
+                                        font: Theme.titleFont
+                                        color: modelData.color
+                                    }
                                 }
                             }
                         }
@@ -95,7 +111,6 @@ Item {
                 }
 
                 Label {
-                    Layout.leftMargin: Theme.spacing
                     text: qsTr("标签排行榜")
                     font: Theme.headingFont
                     color: Theme.textPrimary
@@ -103,18 +118,17 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.leftMargin: Theme.spacing
-                    Layout.rightMargin: Theme.spacing
-                    Layout.preferredHeight: Math.max(120, tagColumn.implicitHeight + 24)
-                    radius: Theme.radius
+                    Layout.preferredHeight: Math.max(160, tagColumn.implicitHeight + 32)
+                    radius: Theme.radiusLarge
                     color: Theme.surface
-                    border.color: Theme.border
+                    border.color: Theme.borderLight
+                    border.width: 1
 
                     Column {
                         id: tagColumn
                         anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
+                        anchors.margins: 16
+                        spacing: 10
 
                         Repeater {
                             model: stats.tagRanking || []
@@ -123,11 +137,18 @@ Item {
                                 width: parent.width
                                 spacing: 12
 
-                                Label {
-                                    Layout.preferredWidth: 24
-                                    text: (index + 1).toString()
-                                    color: Theme.textSecondary
-                                    font: Theme.captionFont
+                                Rectangle {
+                                    Layout.preferredWidth: 28
+                                    Layout.preferredHeight: 28
+                                    radius: 14
+                                    color: index < 3 ? Theme.accentMuted : Theme.backgroundAlt
+
+                                    Label {
+                                        anchors.centerIn: parent
+                                        text: (index + 1).toString()
+                                        color: index < 3 ? Theme.accentHover : Theme.textMuted
+                                        font: Theme.labelFont
+                                    }
                                 }
 
                                 Label {
@@ -140,14 +161,14 @@ Item {
 
                                 Item {
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 8
+                                    Layout.preferredHeight: 10
 
                                     Rectangle {
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: parent.width
-                                        height: 8
-                                        radius: 4
-                                        color: Theme.surfaceHover
+                                        height: 10
+                                        radius: 5
+                                        color: Theme.backgroundAlt
                                     }
 
                                     Rectangle {
@@ -157,9 +178,13 @@ Item {
                                                 ? stats.tagRanking[0].count : 1
                                             return parent.width * (modelData.count / maxCount)
                                         }
-                                        height: 8
-                                        radius: 4
-                                        color: Theme.accent
+                                        height: 10
+                                        radius: 5
+                                        gradient: Gradient {
+                                            orientation: Gradient.Horizontal
+                                            GradientStop { position: 0.0; color: Theme.accent }
+                                            GradientStop { position: 1.0; color: Theme.accentHover }
+                                        }
                                     }
                                 }
 
@@ -171,11 +196,12 @@ Item {
                             }
                         }
 
-                        Label {
+                        EmptyState {
+                            width: parent.width
                             visible: !stats.tagRanking || stats.tagRanking.length === 0
-                            text: qsTr("暂无标签数据")
-                            color: Theme.textSecondary
-                            font: Theme.bodyFont
+                            iconSource: "tag"
+                            title: qsTr("暂无标签数据")
+                            subtitle: qsTr("给作品添加标签后，这里会显示使用频率排行")
                         }
                     }
                 }

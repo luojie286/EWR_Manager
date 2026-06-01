@@ -7,50 +7,52 @@ Rectangle {
     id: root
 
     property string title: ""
-    property string backLabel: qsTr("← 返回")
+    property string backLabel: qsTr("返回")
 
     signal backClicked()
 
     default property alias actions: actionsLayout.data
 
-    implicitHeight: 56
+    implicitHeight: 60
+    radius: Theme.radiusLarge
     color: Theme.surface
-
-    Rectangle {
-        anchors.bottom: parent.bottom
-        width: parent.width
-        height: 1
-        color: Theme.border
-    }
+    border.color: Theme.borderLight
+    border.width: 1
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 8
+        anchors.leftMargin: 12
         anchors.rightMargin: Theme.spacing
         spacing: 12
 
         Button {
             id: backButton
-            text: root.backLabel
             Layout.preferredHeight: 40
-            Layout.minimumWidth: 96
+            Layout.minimumWidth: 100
             onClicked: root.backClicked()
+
+            contentItem: RowLayout {
+                spacing: 6
+
+                Icon {
+                    iconSource: "arrow-left"
+                    size: Theme.iconSizeSmall
+                }
+
+                Text {
+                    text: root.backLabel.replace("← ", "")
+                    font.pixelSize: Theme.bodyFont.pixelSize
+                    font.weight: Font.Medium
+                    color: Theme.textPrimary
+                }
+            }
 
             background: Rectangle {
                 radius: Theme.radius
-                color: backButton.pressed ? Theme.accent
-                      : (backButton.hovered ? Theme.accentSoft : Theme.accentSoft)
-                border.color: Theme.accent
+                color: backButton.pressed ? Theme.accentMuted
+                      : (backButton.hovered ? Theme.surfaceElevated : Theme.surfaceHover)
+                border.color: backButton.hovered ? Theme.accent : Theme.border
                 border.width: 1
-            }
-
-            contentItem: Text {
-                text: backButton.text
-                font.pixelSize: Theme.bodyFont.pixelSize
-                font.weight: Font.DemiBold
-                color: Theme.textPrimary
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
             }
         }
 
