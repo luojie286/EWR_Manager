@@ -1,5 +1,6 @@
 #include "AnimeController.h"
 
+#include "BangumiClient.h"
 #include "DatabaseManager.h"
 
 #include <QDate>
@@ -161,6 +162,90 @@ void AnimeController::seedSampleData()
     }
 }
 
+void AnimeController::linkSampleBangumiIds()
+{
+    const struct {
+        const char *title;
+        int bgmId;
+    } mappings[] = {
+        {"葬送的芙莉莲", 378862},
+        {"CLANNAD", 25961},
+        {"命运石之门", 29983},
+        {"机动战士高达", 975},
+        {"四月是你的谎言", 120835},
+        {"Angel Beats!", 25990},
+    };
+
+    for (const auto &mapping : mappings) {
+        const int animeId =
+            DatabaseManager::instance().findAnimeIdByTitle(QString::fromUtf8(mapping.title));
+        if (animeId <= 0) {
+            continue;
+        }
+
+        const AnimeRecord anime = DatabaseManager::instance().fetchAnime(animeId);
+        if (anime.bgmId <= 0) {
+            DatabaseManager::instance().setAnimeBgmId(animeId, mapping.bgmId);
+        }
+    }
+}
+
+bool AnimeController::applyBangumiSync(int localAnimeId, const QVariantMap &data)
+{
+    if (localAnimeId <= 0) {
+        return false;
+    }
+
+    AnimeRecord anime = DatabaseManager::instance().fetchAnime(localAnimeId);
+    if (anime.id <= 0) {
+        return false;
+    }
+
+    const QString title = data.value(QStringLiteral("title")).toString();
+    if (!title.isEmpty()) {
+        anime.title = title;
+    }
+
+    const QString description = data.value(QStringLiteral("description")).toString();
+    if (!description.isEmpty()) {
+        anime.description = description;
+    }
+
+    const QString coverPath = data.value(QStringLiteral("coverPath")).toString();
+    if (!coverPath.isEmpty()) {
+        anime.coverPath = coverPath;
+    }
+
+    const int bgmId = data.value(QStringLiteral("bgmId")).toInt();
+    if (bgmId > 0) {
+        anime.bgmId = bgmId;
+    }
+
+    const QStringList tags = parseTags(data.value(QStringLiteral("tags")));
+    if (!tags.isEmpty()) {
+        anime.tags = tags;
+    }
+
+    return DatabaseManager::instance().updateAnime(anime);
+}
+
+void AnimeController::syncPendingAnimeFromBangumi(BangumiClient *client)
+{
+    if (!client) {
+        return;
+    }
+
+    linkSampleBangumiIds();
+
+    const QVector<int> ids = DatabaseManager::instance().fetchAnimeIdsNeedingBangumiSync();
+    if (ids.isEmpty()) {
+        emit bangumiSyncCompleted();
+        return;
+    }
+
+    client->startLocalSync(ids);
+}
+
 AnimeRecord AnimeController::mapToAnime(const QVariantMap &data) const
 {
     AnimeRecord anime;
@@ -170,6 +255,7 @@ AnimeRecord AnimeController::mapToAnime(const QVariantMap &data) const
     anime.status = data.value(QStringLiteral("status"), QStringLiteral("未看")).toString();
     anime.description = data.value(QStringLiteral("description")).toString();
     anime.coverPath = data.value(QStringLiteral("coverPath")).toString();
+    anime.bgmId = data.value(QStringLiteral("bgmId")).toInt();
     anime.tags = parseTags(data.value(QStringLiteral("tags")));
     return anime;
 }
@@ -195,6 +281,7 @@ QVariantMap AnimeController::animeToMap(const AnimeRecord &anime) const
     map.insert(QStringLiteral("status"), anime.status);
     map.insert(QStringLiteral("description"), anime.description);
     map.insert(QStringLiteral("coverPath"), anime.coverPath);
+    map.insert(QStringLiteral("bgmId"), anime.bgmId);
     map.insert(QStringLiteral("tags"), anime.tags);
     return map;
 }

@@ -60,8 +60,13 @@ bool DatabaseManager::createTables()
             "score REAL DEFAULT 0,"
             "status TEXT DEFAULT '未看',"
             "description TEXT DEFAULT '',"
-            "cover_path TEXT DEFAULT ''"
+            "cover_path TEXT DEFAULT '',"
+            "bgm_id INTEGER DEFAULT 0"
             ")"))) {
+        return false;
+    }
+
+    if (!migrateSchema()) {
         return false;
     }
 
@@ -99,6 +104,30 @@ bool DatabaseManager::createTables()
     return true;
 }
 
+bool DatabaseManager::migrateSchema()
+{
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral("PRAGMA table_info(anime)"))) {
+        return false;
+    }
+
+    bool hasBgmId = false;
+    while (query.next()) {
+        if (query.value(1).toString() == QStringLiteral("bgm_id")) {
+            hasBgmId = true;
+            break;
+        }
+    }
+
+    if (!hasBgmId) {
+        if (!query.exec(QStringLiteral("ALTER TABLE anime ADD COLUMN bgm_id INTEGER DEFAULT 0"))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 QVector<AnimeRecord> DatabaseManager::fetchAllAnime(const QString &searchText,
                                                     const QString &statusFilter,
                                                     const QString &tagFilter) const
@@ -109,7 +138,7 @@ QVector<AnimeRecord> DatabaseManager::fetchAllAnime(const QString &searchText,
     }
 
     QString sql = QStringLiteral(
-        "SELECT DISTINCT a.id, a.title, a.score, a.status, a.description, a.cover_path "
+        "SELECT DISTINCT a.id, a.title, a.score, a.status, a.description, a.cover_path, a.bgm_id "
         "FROM anime a");
 
     QStringList conditions;
@@ -161,6 +190,7 @@ QVector<AnimeRecord> DatabaseManager::fetchAllAnime(const QString &searchText,
         anime.status = query.value(3).toString();
         anime.description = query.value(4).toString();
         anime.coverPath = query.value(5).toString();
+        anime.bgmId = query.value(6).toInt();
         anime.tags = fetchTagsForAnime(anime.id);
         result.append(anime);
     }
@@ -177,7 +207,7 @@ AnimeRecord DatabaseManager::fetchAnime(int id) const
 
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
-        "SELECT id, title, score, status, description, cover_path "
+        "SELECT id, title, score, status, description, cover_path, bgm_id "
         "FROM anime WHERE id = :id"));
     query.bindValue(QStringLiteral(":id"), id);
 
@@ -188,6 +218,7 @@ AnimeRecord DatabaseManager::fetchAnime(int id) const
         anime.status = query.value(3).toString();
         anime.description = query.value(4).toString();
         anime.coverPath = query.value(5).toString();
+        anime.bgmId = query.value(6).toInt();
         anime.tags = fetchTagsForAnime(anime.id);
     }
 
@@ -202,13 +233,14 @@ int DatabaseManager::insertAnime(const AnimeRecord &anime)
 
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
-        "INSERT INTO anime (title, score, status, description, cover_path) "
-        "VALUES (:title, :score, :status, :description, :cover_path)"));
+        "INSERT INTO anime (title, score, status, description, cover_path, bgm_id) "
+        "VALUES (:title, :score, :status, :description, :cover_path, :bgm_id)"));
     query.bindValue(QStringLiteral(":title"), anime.title);
     query.bindValue(QStringLiteral(":score"), anime.score);
     query.bindValue(QStringLiteral(":status"), anime.status);
     query.bindValue(QStringLiteral(":description"), anime.description);
     query.bindValue(QStringLiteral(":cover_path"), anime.coverPath);
+    query.bindValue(QStringLiteral(":bgm_id"), anime.bgmId);
 
     if (!query.exec()) {
         return -1;
@@ -228,12 +260,14 @@ bool DatabaseManager::updateAnime(const AnimeRecord &anime)
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
         "UPDATE anime SET title = :title, score = :score, status = :status, "
-        "description = :description, cover_path = :cover_path WHERE id = :id"));
+        "description = :description, cover_path = :cover_path, bgm_id = :bgm_id "
+        "WHERE id = :id"));
     query.bindValue(QStringLiteral(":title"), anime.title);
     query.bindValue(QStringLiteral(":score"), anime.score);
     query.bindValue(QStringLiteral(":status"), anime.status);
     query.bindValue(QStringLiteral(":description"), anime.description);
     query.bindValue(QStringLiteral(":cover_path"), anime.coverPath);
+    query.bindValue(QStringLiteral(":bgm_id"), anime.bgmId);
     query.bindValue(QStringLiteral(":id"), anime.id);
 
     if (!query.exec()) {
@@ -513,4 +547,52 @@ int DatabaseManager::ensureTag(const QString &name) const
     }
 
     return insertQuery.lastInsertId().toInt();
+}
+
+int DatabaseManager::findAnimeIdByTitle(const QString &title) const
+{
+    if (!m_ready || title.isEmpty()) {
+        return 0;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT id FROM anime WHERE title = :title LIMIT 1"));
+    query.bindValue(QStringLiteral(":title"), title);
+    if (query.exec() && query.next()) {
+        return query.value(0).toInt();
+    }
+    return 0;
+}
+
+bool DatabaseManager::setAnimeBgmId(int animeId, int bgmId)
+{
+    if (!m_ready || animeId <= 0 || bgmId <= 0) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("UPDATE anime SET bgm_id = :bgm_id WHERE id = :id"));
+    query.bindValue(QStringLiteral(":bgm_id"), bgmId);
+    query.bindValue(QStringLiteral(":id"), animeId);
+    return query.exec();
+}
+
+QVector<int> DatabaseManager::fetchAnimeIdsNeedingBangumiSync() const
+{
+    QVector<int> ids;
+    if (!m_ready) {
+        return ids;
+    }
+
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral(
+            "SELECT id FROM anime WHERE bgm_id > 0 AND (cover_path IS NULL OR cover_path = '') "
+            "ORDER BY id ASC"))) {
+        return ids;
+    }
+
+    while (query.next()) {
+        ids.append(query.value(0).toInt());
+    }
+    return ids;
 }

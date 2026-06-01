@@ -28,15 +28,18 @@ Rectangle {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 180
+        height: 172
         color: Theme.surfaceHover
+        clip: true
 
         Image {
             id: coverImage
             anchors.fill: parent
             source: coverPath ? "file:///" + coverPath.replace(/\\/g, "/") : ""
-            fillMode: Image.PreserveAspectCrop
-            visible: status === Image.Ready
+            fillMode: Image.PreserveAspectFit
+            horizontalAlignment: Image.AlignHCenter
+            verticalAlignment: Image.AlignVCenter
+            visible: coverImage.status === Image.Ready
         }
 
         Label {
@@ -71,19 +74,23 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 12
-        spacing: 6
+        anchors.margins: 10
+        spacing: 4
 
         Label {
             Layout.fillWidth: true
+            Layout.preferredHeight: 20
             text: title
-            font: Theme.headingFont
+            font.pixelSize: 15
+            font.weight: Font.DemiBold
             color: Theme.textPrimary
             elide: Text.ElideRight
+            maximumLineCount: 1
         }
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.preferredHeight: 22
             spacing: 4
 
             Label {
@@ -99,18 +106,31 @@ Rectangle {
 
             Item { Layout.fillWidth: true }
 
-            ToolButton {
+            Text {
                 text: "✎"
-                onClicked: root.editRequested()
+                font.pixelSize: 14
+                color: editMouseArea.containsMouse ? Theme.textPrimary : Theme.textSecondary
+
+                MouseArea {
+                    id: editMouseArea
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    hoverEnabled: true
+                    onClicked: root.editRequested()
+                }
             }
         }
 
         Flow {
+            id: tagFlow
             Layout.fillWidth: true
+            Layout.preferredHeight: implicitHeight
             spacing: 4
+
             Repeater {
                 model: tags.slice(0, 3)
                 TagChip {
+                    compact: true
                     tagName: modelData
                 }
             }
@@ -119,6 +139,7 @@ Rectangle {
 
     MouseArea {
         anchors.fill: parent
+        z: -1
         onClicked: root.clicked()
     }
 }

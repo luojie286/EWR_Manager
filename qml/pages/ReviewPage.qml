@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import AppTheme 1.0
+import "../components"
 
-ScrollView {
+Item {
     id: root
     objectName: "ReviewPage"
 
@@ -20,8 +21,6 @@ ScrollView {
     signal back()
     signal saved()
 
-    clip: true
-
     Component.onCompleted: {
         if (!isNew) {
             review = animeController.getReview(reviewId)
@@ -29,24 +28,13 @@ ScrollView {
     }
 
     ColumnLayout {
-        width: root.availableWidth
-        spacing: Theme.spacing
+        anchors.fill: parent
+        spacing: 0
 
-        RowLayout {
+        PageBackBar {
             Layout.fillWidth: true
-
-            Button {
-                text: qsTr("← 返回")
-                flat: true
-                onClicked: root.back()
-            }
-
-            Label {
-                Layout.fillWidth: true
-                text: isNew ? qsTr("写感想") : qsTr("编辑感想")
-                font: Theme.titleFont
-                color: Theme.textPrimary
-            }
+            title: isNew ? qsTr("写感想") : qsTr("编辑感想")
+            onBackClicked: root.back()
 
             Button {
                 text: qsTr("保存")
@@ -56,52 +44,72 @@ ScrollView {
             }
         }
 
-        Label {
-            text: qsTr("作品：%1").arg(animeController.getAnime(animeId).title || "")
-            font: Theme.bodyFont
-            color: Theme.textSecondary
-        }
-
-        Label { text: qsTr("日期"); color: Theme.textSecondary; font: Theme.captionFont }
-        TextField {
-            id: dateField
+        ScrollView {
             Layout.fillWidth: true
-            text: review.date || Qt.formatDate(new Date(), "yyyy-MM-dd")
-            placeholderText: "yyyy-MM-dd"
-            color: Theme.textPrimary
-            background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
-        }
+            Layout.fillHeight: true
+            clip: true
 
-        Label { text: qsTr("标题"); color: Theme.textSecondary; font: Theme.captionFont }
-        TextField {
-            id: titleField
-            Layout.fillWidth: true
-            text: review.title || ""
-            placeholderText: qsTr("例如：二刷、神作")
-            color: Theme.textPrimary
-            background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
-        }
+            ColumnLayout {
+                width: root.width
+                spacing: Theme.spacing
 
-        Label { text: qsTr("内容 *"); color: Theme.textSecondary; font: Theme.captionFont }
-        TextArea {
-            id: contentField
-            Layout.fillWidth: true
-            Layout.preferredHeight: 240
-            text: review.content || ""
-            wrapMode: TextArea.Wrap
-            placeholderText: qsTr("写下你的观感…")
-            color: Theme.textPrimary
-            background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
-        }
+                Item { Layout.preferredHeight: 4 }
 
-        Item {
-            visible: !isNew
-            Layout.fillWidth: true
+                Label {
+                    Layout.leftMargin: Theme.spacing
+                    Layout.rightMargin: Theme.spacing
+                    text: qsTr("作品：%1").arg(animeController.getAnime(animeId).title || "")
+                    font: Theme.bodyFont
+                    color: Theme.textSecondary
+                }
 
-            Button {
-                anchors.right: parent.right
-                text: qsTr("删除感想")
-                onClicked: deleteDialog.open()
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.spacing
+                    Layout.rightMargin: Theme.spacing
+                    spacing: Theme.spacing
+
+                    Label { text: qsTr("日期"); color: Theme.textSecondary; font: Theme.captionFont }
+                    TextField {
+                        id: dateField
+                        Layout.fillWidth: true
+                        text: review.date || Qt.formatDate(new Date(), "yyyy-MM-dd")
+                        placeholderText: "yyyy-MM-dd"
+                        color: Theme.textPrimary
+                        background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
+                    }
+
+                    Label { text: qsTr("标题"); color: Theme.textSecondary; font: Theme.captionFont }
+                    TextField {
+                        id: titleField
+                        Layout.fillWidth: true
+                        text: review.title || ""
+                        placeholderText: qsTr("例如：二刷、神作")
+                        color: Theme.textPrimary
+                        background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
+                    }
+
+                    Label { text: qsTr("内容 *"); color: Theme.textSecondary; font: Theme.captionFont }
+                    TextArea {
+                        id: contentField
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 240
+                        text: review.content || ""
+                        wrapMode: TextArea.Wrap
+                        placeholderText: qsTr("写下你的观感…")
+                        color: Theme.textPrimary
+                        background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
+                    }
+
+                    Button {
+                        visible: !isNew
+                        Layout.alignment: Qt.AlignRight
+                        text: qsTr("删除感想")
+                        onClicked: deleteDialog.open()
+                    }
+                }
+
+                Item { Layout.preferredHeight: Theme.spacing }
             }
         }
     }

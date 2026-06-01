@@ -6,6 +6,8 @@
 #include <QStringList>
 #include <QVariantMap>
 
+class BangumiClient;
+
 class AnimeController : public QObject
 {
     Q_OBJECT
@@ -27,6 +29,13 @@ public:
     Q_INVOKABLE QVariantMap statistics() const;
     Q_INVOKABLE QStringList statusOptions() const;
     Q_INVOKABLE void seedSampleData();
+
+    void linkSampleBangumiIds();
+    bool applyBangumiSync(int localAnimeId, const QVariantMap &data);
+    void syncPendingAnimeFromBangumi(BangumiClient *client);
+
+signals:
+    void bangumiSyncCompleted();
 
 private:
     AnimeRecord mapToAnime(const QVariantMap &data) const;

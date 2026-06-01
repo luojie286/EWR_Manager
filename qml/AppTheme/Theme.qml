@@ -17,7 +17,7 @@ QtObject {
     readonly property int radius: 12
     readonly property int spacing: 16
     readonly property int cardWidth: 180
-    readonly property int cardHeight: 280
+    readonly property int cardHeight: 320
 
     readonly property font titleFont: Qt.font({ pixelSize: 24, weight: Font.DemiBold })
     readonly property font headingFont: Qt.font({ pixelSize: 18, weight: Font.DemiBold })

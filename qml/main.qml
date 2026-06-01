@@ -10,7 +10,7 @@ ApplicationWindow {
     width: 1200
     height: 800
     visible: true
-    title: qsTr("个人动漫记录管理")
+    title: qsTr("EWR_Manager")
     color: Theme.background
 
     property var currentAnime: ({})
@@ -27,7 +27,7 @@ ApplicationWindow {
             spacing: Theme.spacing
 
             Label {
-                text: qsTr("Anime Manager")
+                text: qsTr("EWR_Manager")
                 font: Theme.titleFont
                 color: Theme.textPrimary
             }
@@ -97,8 +97,6 @@ ApplicationWindow {
     Component {
         id: detailPageComponent
         DetailPage {
-            property int animeId: 0
-
             onBack: stackView.pop()
             onEditAnime: function(id) {
                 stackView.push(editPageComponent, { animeId: id })
@@ -122,8 +120,6 @@ ApplicationWindow {
     Component {
         id: editPageComponent
         EditPage {
-            property int animeId: 0
-
             onBack: stackView.pop()
             onSaved: {
                 animeModel.refresh()
@@ -135,9 +131,6 @@ ApplicationWindow {
     Component {
         id: reviewPageComponent
         ReviewPage {
-            property int animeId: 0
-            property int reviewId: 0
-
             onBack: stackView.pop()
             onSaved: {
                 reviewModel.refresh()

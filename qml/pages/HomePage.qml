@@ -69,18 +69,32 @@ Item {
             color: Theme.textSecondary
         }
 
-        ScrollView {
+        GridView {
+            id: gridView
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            GridView {
-                id: gridView
-                model: animeModel
-                cellWidth: Theme.cardWidth + Theme.spacing
-                cellHeight: Theme.cardHeight + Theme.spacing
+            cellWidth: Theme.cardWidth + Theme.spacing
+            cellHeight: Theme.cardHeight + Theme.spacing
+            topMargin: 4
+            leftMargin: 4
+            rightMargin: 4
+            bottomMargin: Theme.spacing
 
-                delegate: AnimeCard {
+            model: animeModel
+
+            delegate: Item {
+                width: gridView.cellWidth
+                height: gridView.cellHeight
+
+                AnimeCard {
+                    width: Theme.cardWidth
+                    height: Theme.cardHeight
+                    anchors.top: parent.top
+                    anchors.horizontalCenter: parent.horizontalCenter
+
                     animeId: model.animeId
                     title: model.title
                     score: model.score

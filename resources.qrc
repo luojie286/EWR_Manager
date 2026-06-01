@@ -8,6 +8,8 @@
         <file>qml/components/ReviewItem.qml</file>
         <file>qml/components/StatusFilter.qml</file>
         <file>qml/components/NavButton.qml</file>
+        <file>qml/components/PageBackBar.qml</file>
+        <file>qml/components/BangumiSearchDialog.qml</file>
         <file>qml/pages/HomePage.qml</file>
         <file>qml/pages/DetailPage.qml</file>
         <file>qml/pages/EditPage.qml</file>

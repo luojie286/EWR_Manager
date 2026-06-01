@@ -14,6 +14,7 @@ struct AnimeRecord {
     QString status;
     QString description;
     QString coverPath;
+    int bgmId = 0;
     QStringList tags;
 };
 
@@ -64,9 +65,14 @@ public:
 
     StatisticsRecord fetchStatistics() const;
 
+    int findAnimeIdByTitle(const QString &title) const;
+    bool setAnimeBgmId(int animeId, int bgmId);
+    QVector<int> fetchAnimeIdsNeedingBangumiSync() const;
+
 private:
     explicit DatabaseManager(QObject *parent = nullptr);
     bool createTables();
+    bool migrateSchema();
     QStringList fetchTagsForAnime(int animeId) const;
     int ensureTag(const QString &name) const;
 

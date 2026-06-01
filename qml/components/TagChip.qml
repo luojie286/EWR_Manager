@@ -8,12 +8,14 @@ Rectangle {
     property bool selected: false
     property bool removable: false
 
+    property bool compact: false
+
     signal clicked()
     signal removeRequested()
 
-    height: 28
-    width: tagText.width + (removable ? 36 : 24)
-    radius: 14
+    height: compact ? 22 : 28
+    width: tagText.width + (removable ? 36 : (compact ? 20 : 24))
+    radius: height / 2
     color: selected ? Theme.accentSoft : Theme.surface
     border.color: selected ? Theme.accent : Theme.border
     border.width: 1
@@ -21,7 +23,7 @@ Rectangle {
     Text {
         id: tagText
         anchors.left: parent.left
-        anchors.leftMargin: 12
+        anchors.leftMargin: compact ? 8 : 12
         anchors.verticalCenter: parent.verticalCenter
         text: tagName
         font: Theme.captionFont
