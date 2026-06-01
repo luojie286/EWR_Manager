@@ -1,0 +1,17 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/main.qml</file>
+        <file>qml/AppTheme/Theme.qml</file>
+        <file>qml/AppTheme/qmldir</file>
+        <file>qml/components/AnimeCard.qml</file>
+        <file>qml/components/TagChip.qml</file>
+        <file>qml/components/ReviewItem.qml</file>
+        <file>qml/components/StatusFilter.qml</file>
+        <file>qml/components/NavButton.qml</file>
+        <file>qml/pages/HomePage.qml</file>
+        <file>qml/pages/DetailPage.qml</file>
+        <file>qml/pages/EditPage.qml</file>
+        <file>qml/pages/ReviewPage.qml</file>
+        <file>qml/pages/StatisticsPage.qml</file>
+    </qresource>
+</RCC>
