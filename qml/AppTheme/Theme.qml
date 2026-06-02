@@ -42,9 +42,11 @@ QtObject {
     function statusColor(status) {
         switch (status) {
         case "看完": return success
+        case "玩完": return success
         case "在看": return warning
         case "弃坑": return danger
         case "未看": return accent
+        case "未玩": return accent
         default: return textSecondary
         }
     }
@@ -52,9 +54,11 @@ QtObject {
     function statusBgColor(status) {
         switch (status) {
         case "看完": return "#1a3d2a"
+        case "玩完": return "#1a3d2a"
         case "在看": return "#3d3218"
         case "弃坑": return "#3d1f1f"
         case "未看": return accentMuted
+        case "未玩": return accentMuted
         default: return surfaceHover
         }
     }

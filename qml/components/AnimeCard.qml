@@ -163,27 +163,12 @@ Item {
 
                 Item { Layout.fillWidth: true }
 
-                Rectangle {
-                    width: 28
-                    height: 28
-                    radius: 14
-                    color: editMouseArea.containsMouse ? Theme.accentMuted : "transparent"
-                    border.color: editMouseArea.containsMouse ? Theme.accent : "transparent"
-                    border.width: 1
-
-                    Icon {
-                        anchors.centerIn: parent
-                        iconSource: "pencil"
-                        size: Theme.iconSizeSmall
-                        iconOpacity: editMouseArea.containsMouse ? 1.0 : 0.55
-                    }
-
-                    MouseArea {
-                        id: editMouseArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: root.editRequested()
-                    }
+                ActionButton {
+                    actionType: "edit"
+                    compact: true
+                    ToolTip.text: qsTr("编辑")
+                    ToolTip.visible: hovered
+                    onClicked: root.editRequested()
                 }
             }
 

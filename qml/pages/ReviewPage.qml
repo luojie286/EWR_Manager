@@ -8,23 +8,33 @@ Item {
     id: root
     objectName: "ReviewPage"
 
-    property int animeId: 0
+    property string section: "anime"
+    property int workId: 0
     property int reviewId: 0
     property bool isNew: reviewId === 0
-    property var review: isNew ? {
-        animeId: animeId,
-        date: Qt.formatDate(new Date(), "yyyy-MM-dd"),
-        title: "",
-        content: ""
-    } : animeController.getReview(reviewId)
+
+    readonly property var ctrl: section === "game" ? gameController : animeController
+    readonly property bool isGame: section === "game"
 
     signal back()
     signal saved()
 
+    property var review: isNew ? {
+        date: Qt.formatDate(new Date(), "yyyy-MM-dd"),
+        title: "",
+        content: ""
+    } : ctrl.getReview(reviewId)
+
     Component.onCompleted: {
         if (!isNew) {
-            review = animeController.getReview(reviewId)
+            review = ctrl.getReview(reviewId)
         }
+    }
+
+    function workTitle() {
+        if (workId <= 0)
+            return ""
+        return isGame ? gameController.getGame(workId).title : animeController.getAnime(workId).title
     }
 
     ColumnLayout {
@@ -58,7 +68,7 @@ Item {
                 Label {
                     Layout.leftMargin: Theme.spacing
                     Layout.rightMargin: Theme.spacing
-                    text: qsTr("作品：%1").arg(animeController.getAnime(animeId).title || "")
+                    text: (isGame ? qsTr("游戏：%1") : qsTr("作品：%1")).arg(workTitle())
                     font: Theme.bodyFont
                     color: Theme.textSecondary
                 }
@@ -101,10 +111,11 @@ Item {
                         background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
                     }
 
-                    Button {
+                    ActionButton {
                         visible: !isNew
                         Layout.alignment: Qt.AlignRight
                         text: qsTr("删除感想")
+                        actionType: "delete"
                         onClicked: deleteDialog.open()
                     }
                 }
@@ -124,7 +135,7 @@ Item {
         Label { text: qsTr("确定要删除这条感想吗？") }
 
         onAccepted: {
-            if (animeController.deleteReview(reviewId)) {
+            if (ctrl.deleteReview(reviewId)) {
                 root.saved()
             }
         }
@@ -133,14 +144,20 @@ Item {
     function saveReview() {
         var data = {
             reviewId: reviewId,
-            animeId: animeId,
             date: dateField.text.trim(),
             title: titleField.text.trim(),
             content: contentField.text.trim()
         }
 
-        var ok = isNew ? (animeController.addReview(data) > 0)
-                       : animeController.updateReview(data)
+        var ok
+        if (isGame) {
+            data.gameId = workId
+            ok = isNew ? (gameController.addReview(data) > 0) : gameController.updateReview(data)
+        } else {
+            data.animeId = workId
+            ok = isNew ? (animeController.addReview(data) > 0) : animeController.updateReview(data)
+        }
+
         if (ok) {
             root.saved()
         }

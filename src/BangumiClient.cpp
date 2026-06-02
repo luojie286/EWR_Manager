@@ -11,11 +11,21 @@
 #include <QNetworkRequest>
 #include <QUrl>
 
-BangumiClient::BangumiClient(const QString &coversDir, QObject *parent)
+BangumiClient::BangumiClient(const QString &coversDir, int subjectType, QObject *parent)
     : QObject(parent)
     , m_coversDir(coversDir)
+    , m_subjectType(subjectType)
 {
     QDir().mkpath(m_coversDir);
+}
+
+void BangumiClient::setSubjectType(int subjectType)
+{
+    if (m_subjectType == subjectType) {
+        return;
+    }
+    m_subjectType = subjectType;
+    emit subjectTypeChanged();
 }
 
 void BangumiClient::setBusy(bool busy)
@@ -86,13 +96,14 @@ QVariantList BangumiClient::parseSearchResults(const QJsonArray &data) const
 }
 
 QVariantMap BangumiClient::buildImportData(const QJsonObject &subject, const QString &coverPath,
-                                           int localAnimeId) const
+                                           int localId) const
 {
     const QString nameCn = subject.value(QStringLiteral("name_cn")).toString();
     const QString name = subject.value(QStringLiteral("name")).toString();
 
     QVariantMap data;
-    data.insert(QStringLiteral("localAnimeId"), localAnimeId);
+    data.insert(QStringLiteral("localAnimeId"), localId);
+    data.insert(QStringLiteral("localGameId"), localId);
     data.insert(QStringLiteral("bgmId"), subject.value(QStringLiteral("id")).toInt());
     data.insert(QStringLiteral("title"), nameCn.isEmpty() ? name : nameCn);
     data.insert(QStringLiteral("description"), subject.value(QStringLiteral("summary")).toString());
@@ -124,7 +135,7 @@ void BangumiClient::search(const QString &keyword)
     setBusy(true);
 
     QJsonObject filter;
-    filter.insert(QStringLiteral("type"), QJsonArray{2});
+    filter.insert(QStringLiteral("type"), QJsonArray{m_subjectType});
 
     QJsonObject body;
     body.insert(QStringLiteral("keyword"), trimmed);
@@ -151,7 +162,8 @@ void BangumiClient::search(const QString &keyword)
 
 void BangumiClient::importSubject(int subjectId)
 {
-    importSubjectForLocal(subjectId, 0);
+    const SyncKind kind = m_subjectType == 4 ? SyncKind::Game : SyncKind::Anime;
+    importSubjectForLocal(subjectId, 0, kind);
 }
 
 void BangumiClient::startLocalSync(const QVector<int> &localAnimeIds)
@@ -161,6 +173,15 @@ void BangumiClient::startLocalSync(const QVector<int> &localAnimeIds)
         m_localSyncQueue.enqueue(id);
     }
     processNextLocalSync();
+}
+
+void BangumiClient::startGameLocalSync(const QVector<int> &localGameIds)
+{
+    m_gameLocalSyncQueue.clear();
+    for (int id : localGameIds) {
+        m_gameLocalSyncQueue.enqueue(id);
+    }
+    processNextGameLocalSync();
 }
 
 void BangumiClient::processNextLocalSync()
@@ -180,10 +201,30 @@ void BangumiClient::processNextLocalSync()
         return;
     }
 
-    importSubjectForLocal(anime.bgmId, m_activeLocalSyncId);
+    importSubjectForLocal(anime.bgmId, m_activeLocalSyncId, SyncKind::Anime);
 }
 
-void BangumiClient::importSubjectForLocal(int subjectId, int localAnimeId)
+void BangumiClient::processNextGameLocalSync()
+{
+    if (m_busy || m_gameLocalSyncQueue.isEmpty()) {
+        if (!m_busy && m_gameLocalSyncQueue.isEmpty() && m_activeGameLocalSyncId == 0) {
+            emit gameLocalSyncBatchFinished();
+        }
+        return;
+    }
+
+    m_activeGameLocalSyncId = m_gameLocalSyncQueue.dequeue();
+    const GameRecord game = DatabaseManager::instance().fetchGame(m_activeGameLocalSyncId);
+    if (game.bgmId <= 0) {
+        m_activeGameLocalSyncId = 0;
+        processNextGameLocalSync();
+        return;
+    }
+
+    importSubjectForLocal(game.bgmId, m_activeGameLocalSyncId, SyncKind::Game);
+}
+
+void BangumiClient::importSubjectForLocal(int subjectId, int localId, SyncKind kind)
 {
     if (subjectId <= 0) {
         emit errorOccurred(QStringLiteral("无效的 Bangumi 条目 ID"));
@@ -195,14 +236,19 @@ void BangumiClient::importSubjectForLocal(int subjectId, int localAnimeId)
     const QUrl url(QStringLiteral("https://api.bgm.tv/v0/subjects/%1").arg(subjectId));
     QNetworkReply *reply = m_network.get(createRequest(url));
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, localAnimeId]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, localId, kind]() {
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {
             setBusy(false);
-            if (localAnimeId > 0) {
-                m_activeLocalSyncId = 0;
-                processNextLocalSync();
+            if (localId > 0) {
+                if (kind == SyncKind::Game) {
+                    m_activeGameLocalSyncId = 0;
+                    processNextGameLocalSync();
+                } else {
+                    m_activeLocalSyncId = 0;
+                    processNextLocalSync();
+                }
             } else {
                 emit errorOccurred(reply->errorString());
             }
@@ -212,29 +258,29 @@ void BangumiClient::importSubjectForLocal(int subjectId, int localAnimeId)
         const QJsonObject subject = QJsonDocument::fromJson(reply->readAll()).object();
         const QString imageUrl = pickImageUrl(subject);
         if (imageUrl.isEmpty()) {
-            finishImport(subject, {}, localAnimeId);
+            finishImport(subject, {}, localId, kind);
             return;
         }
 
         downloadCover(subject.value(QStringLiteral("id")).toInt(), QUrl(imageUrl), subject,
-                      localAnimeId);
+                      localId, kind);
     });
 }
 
 void BangumiClient::downloadCover(int subjectId, const QUrl &imageUrl, const QJsonObject &subject,
-                                  int localAnimeId)
+                                  int localId, SyncKind kind)
 {
     const QString coverPath =
         m_coversDir + QDir::separator() + QString::number(subjectId) + QStringLiteral(".jpg");
 
     if (QFile::exists(coverPath)) {
-        finishImport(subject, coverPath, localAnimeId);
+        finishImport(subject, coverPath, localId, kind);
         return;
     }
 
     QNetworkReply *reply = m_network.get(createRequest(imageUrl));
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, subject, coverPath, localAnimeId]() {
+            [this, reply, subject, coverPath, localId, kind]() {
                 reply->deleteLater();
 
                 QString savedPath;
@@ -247,20 +293,26 @@ void BangumiClient::downloadCover(int subjectId, const QUrl &imageUrl, const QJs
                     }
                 }
 
-                finishImport(subject, savedPath, localAnimeId);
+                finishImport(subject, savedPath, localId, kind);
             });
 }
 
 void BangumiClient::finishImport(const QJsonObject &subject, const QString &coverPath,
-                                 int localAnimeId)
+                                 int localId, SyncKind kind)
 {
-    const QVariantMap data = buildImportData(subject, coverPath, localAnimeId);
+    const QVariantMap data = buildImportData(subject, coverPath, localId);
     setBusy(false);
 
-    if (localAnimeId > 0) {
-        emit localSyncFinished(localAnimeId, data);
-        m_activeLocalSyncId = 0;
-        processNextLocalSync();
+    if (localId > 0) {
+        if (kind == SyncKind::Game) {
+            emit gameLocalSyncFinished(localId, data);
+            m_activeGameLocalSyncId = 0;
+            processNextGameLocalSync();
+        } else {
+            emit localSyncFinished(localId, data);
+            m_activeLocalSyncId = 0;
+            processNextLocalSync();
+        }
     } else {
         emit importFinished(data);
     }

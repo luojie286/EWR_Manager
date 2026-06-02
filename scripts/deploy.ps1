@@ -41,28 +41,42 @@ if (-not (Test-Path $ExePath)) {
 $exeDir = Split-Path $ExePath -Parent
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $qmlDir = Join-Path $projectRoot "qml"
-
-$isDebug = $ExePath -match "Debug"
-$deployFlag = if ($isDebug) { "--debug" } else { "--release" }
+$qtPlugins = Join-Path $QtRoot "plugins"
 
 Write-Host "Deploying: $ExePath"
-Write-Host "Build type: $(if ($isDebug) { 'Debug' } else { 'Release' })"
+
+function Copy-PluginFolder {
+    param([string]$Name)
+    $src = Join-Path $qtPlugins $Name
+    if (-not (Test-Path $src)) { return }
+    $dst = Join-Path $exeDir $Name
+    New-Item -ItemType Directory -Force -Path $dst | Out-Null
+    Copy-Item (Join-Path $src "*") $dst -Force
+}
 
 $platformsDir = Join-Path $exeDir "platforms"
 New-Item -ItemType Directory -Force -Path $platformsDir | Out-Null
-Copy-Item (Join-Path $QtRoot "plugins\platforms\qwindows.dll") $platformsDir -Force
+Copy-Item (Join-Path $qtPlugins "platforms\qwindows.dll") $platformsDir -Force
 
 $env:PATH = "$(Join-Path $QtRoot 'bin');$MingwBin;" + $env:PATH
-$env:QT_PLUGIN_PATH = Join-Path $QtRoot "plugins"
+$env:QT_PLUGIN_PATH = $qtPlugins
 
-& $windeployqt $deployFlag --qmldir $qmlDir $ExePath
+& $windeployqt --release --no-translations --qmldir $qmlDir $ExePath
 if ($LASTEXITCODE -ne 0) {
-    Write-Warning "windeployqt exited with code $LASTEXITCODE; copying MinGW runtime anyway."
+    Write-Warning "windeployqt exited with code $LASTEXITCODE; copying essential plugins manually."
+}
+
+foreach ($folder in @("sqldrivers", "imageformats", "iconengines", "tls")) {
+    Copy-PluginFolder $folder
 }
 
 $runtime = @("libgcc_s_seh-1.dll", "libstdc++-6.dll", "libwinpthread-1.dll")
 foreach ($dll in $runtime) {
     Copy-Item (Join-Path $MingwBin $dll) $exeDir -Force
+}
+
+if (-not (Test-Path (Join-Path $exeDir "sqldrivers\qsqlite.dll"))) {
+    throw "Missing sqldrivers/qsqlite.dll after deploy."
 }
 
 Write-Host "Done. You can double-click:"

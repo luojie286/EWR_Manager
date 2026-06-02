@@ -69,25 +69,11 @@ Rectangle {
                 elide: Text.ElideRight
             }
 
-            Rectangle {
-                width: 32
-                height: 32
-                radius: 16
-                color: deleteMouse.containsMouse ? "#3d1f1f" : "transparent"
-
-                Icon {
-                    anchors.centerIn: parent
-                    iconSource: "trash-2"
-                    size: Theme.iconSizeSmall
-                    iconOpacity: deleteMouse.containsMouse ? 1.0 : 0.45
-                }
-
-                MouseArea {
-                    id: deleteMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: root.deleteRequested()
-                }
+            ActionButton {
+                text: qsTr("删除")
+                actionType: "delete"
+                compact: false
+                onClicked: root.deleteRequested()
             }
         }
 

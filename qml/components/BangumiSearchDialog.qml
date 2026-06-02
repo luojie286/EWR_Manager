@@ -6,12 +6,15 @@ import AppTheme 1.0
 Dialog {
     id: root
 
+    property string section: "anime"
     property string initialKeyword: ""
     property var results: []
 
+    readonly property var client: section === "game" ? gameBangumiClient : bangumiClient
+
     signal subjectSelected(int subjectId)
 
-    title: qsTr("从 Bangumi 搜索")
+    title: section === "game" ? qsTr("从 Bangumi 搜索游戏") : qsTr("从 Bangumi 搜索")
     modal: true
     anchors.centerIn: parent
     width: Math.min(560, parent ? parent.width - 80 : 560)
@@ -21,7 +24,7 @@ Dialog {
         searchField.text = initialKeyword
         results = []
         if (searchField.text.trim().length > 0) {
-            bangumiClient.search(searchField.text)
+            client.search(searchField.text)
         }
     }
 
@@ -36,10 +39,12 @@ Dialog {
             TextField {
                 id: searchField
                 Layout.fillWidth: true
-                placeholderText: qsTr("输入作品名，如：葬送的芙莉莲")
+                placeholderText: section === "game"
+                    ? qsTr("输入游戏名，如：塞尔达传说")
+                    : qsTr("输入作品名，如：葬送的芙莉莲")
                 color: Theme.textPrimary
                 placeholderTextColor: Theme.textSecondary
-                onAccepted: bangumiClient.search(text)
+                onAccepted: client.search(text)
 
                 background: Rectangle {
                     radius: 8
@@ -50,14 +55,16 @@ Dialog {
 
             Button {
                 text: qsTr("搜索")
-                enabled: !bangumiClient.busy
-                onClicked: bangumiClient.search(searchField.text)
+                enabled: !client.busy
+                onClicked: client.search(searchField.text)
             }
         }
 
         Label {
-            visible: results.length === 0 && !bangumiClient.busy
-            text: qsTr("输入关键词搜索 Bangumi 动画条目")
+            visible: results.length === 0 && !client.busy
+            text: section === "game"
+                ? qsTr("输入关键词搜索 Bangumi 游戏条目")
+                : qsTr("输入关键词搜索 Bangumi 动画条目")
             color: Theme.textSecondary
             font: Theme.captionFont
         }
@@ -145,7 +152,7 @@ Dialog {
                     id: rowMouseArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    enabled: !bangumiClient.busy
+                    enabled: !client.busy
                     onClicked: {
                         root.close()
                         root.subjectSelected(modelData.subjectId)
@@ -156,12 +163,12 @@ Dialog {
 
         BusyIndicator {
             Layout.alignment: Qt.AlignHCenter
-            running: bangumiClient.busy
+            running: client.busy
         }
     }
 
     Connections {
-        target: bangumiClient
+        target: client
         function onSearchFinished(list) {
             results = list
         }

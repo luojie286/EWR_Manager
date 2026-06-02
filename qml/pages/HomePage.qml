@@ -8,12 +8,17 @@ Item {
     id: root
     objectName: "HomePage"
 
+    property string section: "anime"
+    readonly property var ctrl: section === "game" ? gameController : animeController
+    readonly property var listModel: section === "game" ? gameModel : animeModel
+    readonly property bool isGame: section === "game"
+
     StackView.onActivated: {
-        tagCombo.model = [qsTr("全部标签")].concat(animeController.allTags())
+        tagCombo.model = [qsTr("全部标签")].concat(ctrl.allTags())
     }
 
-    signal openAnime(int animeId)
-    signal openEdit(int animeId)
+    signal openWork(int workId)
+    signal openEdit(int workId)
 
     ColumnLayout {
         anchors.fill: parent
@@ -56,12 +61,14 @@ Item {
                         TextField {
                             id: searchField
                             Layout.fillWidth: true
-                            placeholderText: qsTr("搜索作品名、简介或标签…")
+                            placeholderText: isGame
+                                ? qsTr("搜索游戏名、简介或标签…")
+                                : qsTr("搜索作品名、简介或标签…")
                             font: Theme.bodyFont
                             color: Theme.textPrimary
                             placeholderTextColor: Theme.textMuted
                             background: Item {}
-                            onTextChanged: animeModel.searchText = text
+                            onTextChanged: listModel.searchText = text
                         }
                     }
                 }
@@ -70,10 +77,10 @@ Item {
                     id: tagCombo
                     Layout.preferredWidth: 160
                     Layout.preferredHeight: 44
-                    model: [qsTr("全部标签")].concat(animeController.allTags())
+                    model: [qsTr("全部标签")].concat(ctrl.allTags())
                     font: Theme.bodyFont
                     onActivated: function(index) {
-                        animeModel.tagFilter = index === 0 ? "" : tagCombo.textAt(index)
+                        listModel.tagFilter = index === 0 ? "" : tagCombo.textAt(index)
                     }
 
                     background: Rectangle {
@@ -88,9 +95,10 @@ Item {
 
         StatusFilter {
             id: statusFilter
-            currentFilter: animeModel.statusFilter || "全部"
+            section: root.section
+            currentFilter: listModel.statusFilter || "全部"
             onFilterChanged: function(filter) {
-                animeModel.statusFilter = filter === "全部" ? "" : filter
+                listModel.statusFilter = filter === "全部" ? "" : filter
             }
         }
 
@@ -98,7 +106,9 @@ Item {
             Layout.fillWidth: true
 
             Label {
-                text: qsTr("共 %1 部作品").arg(animeModel.rowCount())
+                text: isGame
+                    ? qsTr("共 %1 部游戏").arg(listModel.rowCount())
+                    : qsTr("共 %1 部作品").arg(listModel.rowCount())
                 font: Theme.captionFont
                 color: Theme.textSecondary
             }
@@ -106,7 +116,7 @@ Item {
             Item { Layout.fillWidth: true }
 
             Rectangle {
-                visible: searchField.text.length > 0 || (animeModel.statusFilter && animeModel.statusFilter.length > 0) || (animeModel.tagFilter && animeModel.tagFilter.length > 0)
+                visible: searchField.text.length > 0 || (listModel.statusFilter && listModel.statusFilter.length > 0) || (listModel.tagFilter && listModel.tagFilter.length > 0)
                 radius: Theme.radiusSmall
                 color: Theme.accentMuted
                 implicitWidth: filterLabel.implicitWidth + 16
@@ -131,7 +141,7 @@ Item {
                 anchors.fill: parent
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                visible: animeModel.rowCount() > 0
+                visible: listModel.rowCount() > 0
 
                 cellWidth: Theme.cardWidth + Theme.spacing
                 cellHeight: Theme.cardHeight + Theme.spacing + Theme.gridCellPadding
@@ -140,11 +150,13 @@ Item {
                 rightMargin: 4
                 bottomMargin: Theme.spacing
 
-                model: animeModel
+                model: listModel
 
                 delegate: Item {
                     width: gridView.cellWidth
                     height: gridView.cellHeight
+
+                    property int workId: isGame ? model.gameId : model.animeId
 
                     AnimeCard {
                         width: Theme.cardWidth
@@ -152,35 +164,39 @@ Item {
                         anchors.top: parent.top
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        animeId: model.animeId
+                        animeId: workId
                         title: model.title
                         score: model.score
                         status: model.status
                         coverPath: model.coverPath
                         tags: model.tags
 
-                        onClicked: root.openAnime(model.animeId)
-                        onEditRequested: root.openEdit(model.animeId)
+                        onClicked: root.openWork(workId)
+                        onEditRequested: root.openEdit(workId)
                     }
                 }
             }
 
             EmptyState {
                 anchors.centerIn: parent
-                visible: animeModel.rowCount() === 0
+                visible: listModel.rowCount() === 0
                 iconSource: searchField.text.length > 0 ? "search" : "inbox"
-                title: searchField.text.length > 0 ? qsTr("没有找到匹配的作品") : qsTr("还没有作品")
+                title: searchField.text.length > 0
+                    ? qsTr("没有找到匹配的内容")
+                    : (isGame ? qsTr("还没有游戏") : qsTr("还没有作品"))
                 subtitle: searchField.text.length > 0
                     ? qsTr("试试换个关键词，或清除筛选条件")
-                    : qsTr("点击右上角「添加作品」开始建立你的收藏")
+                    : (isGame
+                        ? qsTr("点击右上角「添加游戏」开始建立你的游戏库")
+                        : qsTr("点击右上角「添加作品」开始建立你的收藏"))
             }
         }
     }
 
     Connections {
-        target: animeModel
+        target: listModel
         function onSearchTextChanged() {
-            tagCombo.model = [qsTr("全部标签")].concat(animeController.allTags())
+            tagCombo.model = [qsTr("全部标签")].concat(ctrl.allTags())
         }
     }
 }

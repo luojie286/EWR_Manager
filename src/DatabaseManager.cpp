@@ -101,6 +101,42 @@ bool DatabaseManager::createTables()
         return false;
     }
 
+    if (!exec(QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS game ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "title TEXT NOT NULL,"
+            "score REAL DEFAULT 0,"
+            "status TEXT DEFAULT '未玩',"
+            "description TEXT DEFAULT '',"
+            "cover_path TEXT DEFAULT '',"
+            "bgm_id INTEGER DEFAULT 0"
+            ")"))) {
+        return false;
+    }
+
+    if (!exec(QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS game_review ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "game_id INTEGER NOT NULL,"
+            "date TEXT NOT NULL,"
+            "title TEXT DEFAULT '',"
+            "content TEXT DEFAULT '',"
+            "FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE"
+            ")"))) {
+        return false;
+    }
+
+    if (!exec(QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS game_tag ("
+            "game_id INTEGER NOT NULL,"
+            "tag_id INTEGER NOT NULL,"
+            "PRIMARY KEY (game_id, tag_id),"
+            "FOREIGN KEY (game_id) REFERENCES game(id) ON DELETE CASCADE,"
+            "FOREIGN KEY (tag_id) REFERENCES tag(id) ON DELETE CASCADE"
+            ")"))) {
+        return false;
+    }
+
     return true;
 }
 
@@ -587,6 +623,457 @@ QVector<int> DatabaseManager::fetchAnimeIdsNeedingBangumiSync() const
     QSqlQuery query(m_db);
     if (!query.exec(QStringLiteral(
             "SELECT id FROM anime WHERE bgm_id > 0 AND (cover_path IS NULL OR cover_path = '') "
+            "ORDER BY id ASC"))) {
+        return ids;
+    }
+
+    while (query.next()) {
+        ids.append(query.value(0).toInt());
+    }
+    return ids;
+}
+
+QVector<GameRecord> DatabaseManager::fetchAllGames(const QString &searchText,
+                                                   const QString &statusFilter,
+                                                   const QString &tagFilter) const
+{
+    QVector<GameRecord> result;
+    if (!m_ready) {
+        return result;
+    }
+
+    QString sql = QStringLiteral(
+        "SELECT DISTINCT g.id, g.title, g.score, g.status, g.description, g.cover_path, g.bgm_id "
+        "FROM game g");
+
+    QStringList conditions;
+    if (!tagFilter.isEmpty()) {
+        sql += QStringLiteral(
+            " JOIN game_tag gt ON g.id = gt.game_id"
+            " JOIN tag t ON gt.tag_id = t.id");
+        conditions << QStringLiteral("t.name = :tagFilter");
+    }
+
+    if (!searchText.isEmpty()) {
+        conditions << QStringLiteral("(g.title LIKE :search OR g.description LIKE :search)");
+    }
+
+    if (!statusFilter.isEmpty() && statusFilter != QStringLiteral("全部")) {
+        conditions << QStringLiteral("g.status = :statusFilter");
+    }
+
+    if (!conditions.isEmpty()) {
+        sql += QStringLiteral(" WHERE ") + conditions.join(QStringLiteral(" AND "));
+    }
+
+    sql += QStringLiteral(" ORDER BY g.title COLLATE NOCASE ASC");
+
+    QSqlQuery query(m_db);
+    query.prepare(sql);
+
+    if (!searchText.isEmpty()) {
+        query.bindValue(QStringLiteral(":search"), QStringLiteral("%%1%").arg(searchText));
+    }
+    if (!statusFilter.isEmpty() && statusFilter != QStringLiteral("全部")) {
+        query.bindValue(QStringLiteral(":statusFilter"), statusFilter);
+    }
+    if (!tagFilter.isEmpty()) {
+        query.bindValue(QStringLiteral(":tagFilter"), tagFilter);
+    }
+
+    if (!query.exec()) {
+        return result;
+    }
+
+    while (query.next()) {
+        GameRecord game;
+        game.id = query.value(0).toInt();
+        game.title = query.value(1).toString();
+        game.score = query.value(2).toDouble();
+        game.status = query.value(3).toString();
+        game.description = query.value(4).toString();
+        game.coverPath = query.value(5).toString();
+        game.bgmId = query.value(6).toInt();
+        game.tags = fetchTagsForGame(game.id);
+        result.append(game);
+    }
+
+    return result;
+}
+
+GameRecord DatabaseManager::fetchGame(int id) const
+{
+    GameRecord game;
+    if (!m_ready || id <= 0) {
+        return game;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT id, title, score, status, description, cover_path, bgm_id "
+        "FROM game WHERE id = :id"));
+    query.bindValue(QStringLiteral(":id"), id);
+
+    if (query.exec() && query.next()) {
+        game.id = query.value(0).toInt();
+        game.title = query.value(1).toString();
+        game.score = query.value(2).toDouble();
+        game.status = query.value(3).toString();
+        game.description = query.value(4).toString();
+        game.coverPath = query.value(5).toString();
+        game.bgmId = query.value(6).toInt();
+        game.tags = fetchTagsForGame(game.id);
+    }
+
+    return game;
+}
+
+int DatabaseManager::insertGame(const GameRecord &game)
+{
+    if (!m_ready) {
+        return -1;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "INSERT INTO game (title, score, status, description, cover_path, bgm_id) "
+        "VALUES (:title, :score, :status, :description, :cover_path, :bgm_id)"));
+    query.bindValue(QStringLiteral(":title"), game.title);
+    query.bindValue(QStringLiteral(":score"), game.score);
+    query.bindValue(QStringLiteral(":status"), game.status);
+    query.bindValue(QStringLiteral(":description"), game.description);
+    query.bindValue(QStringLiteral(":cover_path"), game.coverPath);
+    query.bindValue(QStringLiteral(":bgm_id"), game.bgmId);
+
+    if (!query.exec()) {
+        return -1;
+    }
+
+    const int id = query.lastInsertId().toInt();
+    setGameTags(id, game.tags);
+    return id;
+}
+
+bool DatabaseManager::updateGame(const GameRecord &game)
+{
+    if (!m_ready || game.id <= 0) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "UPDATE game SET title = :title, score = :score, status = :status, "
+        "description = :description, cover_path = :cover_path, bgm_id = :bgm_id "
+        "WHERE id = :id"));
+    query.bindValue(QStringLiteral(":title"), game.title);
+    query.bindValue(QStringLiteral(":score"), game.score);
+    query.bindValue(QStringLiteral(":status"), game.status);
+    query.bindValue(QStringLiteral(":description"), game.description);
+    query.bindValue(QStringLiteral(":cover_path"), game.coverPath);
+    query.bindValue(QStringLiteral(":bgm_id"), game.bgmId);
+    query.bindValue(QStringLiteral(":id"), game.id);
+
+    if (!query.exec()) {
+        return false;
+    }
+
+    return setGameTags(game.id, game.tags);
+}
+
+bool DatabaseManager::deleteGame(int id)
+{
+    if (!m_ready || id <= 0) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("DELETE FROM game WHERE id = :id"));
+    query.bindValue(QStringLiteral(":id"), id);
+    return query.exec();
+}
+
+QVector<GameReviewRecord> DatabaseManager::fetchGameReviews(int gameId) const
+{
+    QVector<GameReviewRecord> result;
+    if (!m_ready || gameId <= 0) {
+        return result;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT id, game_id, date, title, content FROM game_review "
+        "WHERE game_id = :game_id ORDER BY date DESC, id DESC"));
+    query.bindValue(QStringLiteral(":game_id"), gameId);
+
+    if (!query.exec()) {
+        return result;
+    }
+
+    while (query.next()) {
+        GameReviewRecord review;
+        review.id = query.value(0).toInt();
+        review.gameId = query.value(1).toInt();
+        review.date = query.value(2).toString();
+        review.title = query.value(3).toString();
+        review.content = query.value(4).toString();
+        result.append(review);
+    }
+
+    return result;
+}
+
+GameReviewRecord DatabaseManager::fetchGameReview(int id) const
+{
+    GameReviewRecord review;
+    if (!m_ready || id <= 0) {
+        return review;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT id, game_id, date, title, content FROM game_review WHERE id = :id"));
+    query.bindValue(QStringLiteral(":id"), id);
+
+    if (query.exec() && query.next()) {
+        review.id = query.value(0).toInt();
+        review.gameId = query.value(1).toInt();
+        review.date = query.value(2).toString();
+        review.title = query.value(3).toString();
+        review.content = query.value(4).toString();
+    }
+
+    return review;
+}
+
+int DatabaseManager::insertGameReview(const GameReviewRecord &review)
+{
+    if (!m_ready || review.gameId <= 0) {
+        return -1;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "INSERT INTO game_review (game_id, date, title, content) "
+        "VALUES (:game_id, :date, :title, :content)"));
+    query.bindValue(QStringLiteral(":game_id"), review.gameId);
+    query.bindValue(QStringLiteral(":date"),
+                    review.date.isEmpty()
+                        ? QDate::currentDate().toString(Qt::ISODate)
+                        : review.date);
+    query.bindValue(QStringLiteral(":title"), review.title);
+    query.bindValue(QStringLiteral(":content"), review.content);
+
+    if (!query.exec()) {
+        return -1;
+    }
+
+    return query.lastInsertId().toInt();
+}
+
+bool DatabaseManager::updateGameReview(const GameReviewRecord &review)
+{
+    if (!m_ready || review.id <= 0) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "UPDATE game_review SET date = :date, title = :title, content = :content "
+        "WHERE id = :id"));
+    query.bindValue(QStringLiteral(":date"), review.date);
+    query.bindValue(QStringLiteral(":title"), review.title);
+    query.bindValue(QStringLiteral(":content"), review.content);
+    query.bindValue(QStringLiteral(":id"), review.id);
+
+    return query.exec();
+}
+
+bool DatabaseManager::deleteGameReview(int id)
+{
+    if (!m_ready || id <= 0) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("DELETE FROM game_review WHERE id = :id"));
+    query.bindValue(QStringLiteral(":id"), id);
+    return query.exec();
+}
+
+QStringList DatabaseManager::fetchAllGameTags() const
+{
+    QStringList tags;
+    if (!m_ready) {
+        return tags;
+    }
+
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral(
+            "SELECT DISTINCT t.name FROM tag t "
+            "JOIN game_tag gt ON t.id = gt.tag_id "
+            "ORDER BY t.name COLLATE NOCASE ASC"))) {
+        return tags;
+    }
+
+    while (query.next()) {
+        tags.append(query.value(0).toString());
+    }
+
+    return tags;
+}
+
+bool DatabaseManager::setGameTags(int gameId, const QStringList &tags)
+{
+    if (!m_ready || gameId <= 0) {
+        return false;
+    }
+
+    QSqlQuery deleteQuery(m_db);
+    deleteQuery.prepare(QStringLiteral("DELETE FROM game_tag WHERE game_id = :game_id"));
+    deleteQuery.bindValue(QStringLiteral(":game_id"), gameId);
+    if (!deleteQuery.exec()) {
+        return false;
+    }
+
+    for (const QString &tagName : tags) {
+        const QString trimmed = tagName.trimmed();
+        if (trimmed.isEmpty()) {
+            continue;
+        }
+
+        const int tagId = ensureTag(trimmed);
+        if (tagId <= 0) {
+            continue;
+        }
+
+        QSqlQuery insertQuery(m_db);
+        insertQuery.prepare(QStringLiteral(
+            "INSERT OR IGNORE INTO game_tag (game_id, tag_id) VALUES (:game_id, :tag_id)"));
+        insertQuery.bindValue(QStringLiteral(":game_id"), gameId);
+        insertQuery.bindValue(QStringLiteral(":tag_id"), tagId);
+        if (!insertQuery.exec()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+StatisticsRecord DatabaseManager::fetchGameStatistics() const
+{
+    StatisticsRecord stats;
+    if (!m_ready) {
+        return stats;
+    }
+
+    QSqlQuery query(m_db);
+    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM game")) && query.next()) {
+        stats.totalCount = query.value(0).toInt();
+    }
+
+    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM game WHERE status = '玩完'"))
+        && query.next()) {
+        stats.finishedCount = query.value(0).toInt();
+    }
+
+    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM game WHERE status = '在玩'"))
+        && query.next()) {
+        stats.watchingCount = query.value(0).toInt();
+    }
+
+    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM game WHERE status = '未玩'"))
+        && query.next()) {
+        stats.plannedCount = query.value(0).toInt();
+    }
+
+    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM game WHERE status = '弃坑'"))
+        && query.next()) {
+        stats.droppedCount = query.value(0).toInt();
+    }
+
+    if (query.exec(QStringLiteral("SELECT AVG(score) FROM game WHERE score > 0"))
+        && query.next()) {
+        stats.averageScore = query.value(0).toDouble();
+    }
+
+    if (query.exec(QStringLiteral(
+            "SELECT t.name, COUNT(*) AS cnt FROM tag t "
+            "JOIN game_tag gt ON t.id = gt.tag_id "
+            "GROUP BY t.id ORDER BY cnt DESC, t.name COLLATE NOCASE ASC LIMIT 20"))) {
+        while (query.next()) {
+            QVariantMap item;
+            item.insert(QStringLiteral("name"), query.value(0).toString());
+            item.insert(QStringLiteral("count"), query.value(1).toInt());
+            stats.tagRanking.append(item);
+        }
+    }
+
+    return stats;
+}
+
+QStringList DatabaseManager::fetchTagsForGame(int gameId) const
+{
+    QStringList tags;
+    if (!m_ready || gameId <= 0) {
+        return tags;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT t.name FROM tag t "
+        "JOIN game_tag gt ON t.id = gt.tag_id "
+        "WHERE gt.game_id = :game_id ORDER BY t.name COLLATE NOCASE ASC"));
+    query.bindValue(QStringLiteral(":game_id"), gameId);
+
+    if (!query.exec()) {
+        return tags;
+    }
+
+    while (query.next()) {
+        tags.append(query.value(0).toString());
+    }
+
+    return tags;
+}
+
+int DatabaseManager::findGameIdByTitle(const QString &title) const
+{
+    if (!m_ready || title.isEmpty()) {
+        return 0;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT id FROM game WHERE title = :title LIMIT 1"));
+    query.bindValue(QStringLiteral(":title"), title);
+    if (query.exec() && query.next()) {
+        return query.value(0).toInt();
+    }
+    return 0;
+}
+
+bool DatabaseManager::setGameBgmId(int gameId, int bgmId)
+{
+    if (!m_ready || gameId <= 0 || bgmId <= 0) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("UPDATE game SET bgm_id = :bgm_id WHERE id = :id"));
+    query.bindValue(QStringLiteral(":bgm_id"), bgmId);
+    query.bindValue(QStringLiteral(":id"), gameId);
+    return query.exec();
+}
+
+QVector<int> DatabaseManager::fetchGameIdsNeedingBangumiSync() const
+{
+    QVector<int> ids;
+    if (!m_ready) {
+        return ids;
+    }
+
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral(
+            "SELECT id FROM game WHERE bgm_id > 0 AND (cover_path IS NULL OR cover_path = '') "
             "ORDER BY id ASC"))) {
         return ids;
     }

@@ -10,13 +10,14 @@ Item {
 
     signal back()
 
-    property var stats: animeController.statistics()
+    property string statsSection: "anime"
+    property var stats: statsSection === "game" ? gameController.statistics() : animeController.statistics()
 
     Component.onCompleted: refreshStats()
     StackView.onActivated: refreshStats()
 
     function refreshStats() {
-        stats = animeController.statistics()
+        stats = statsSection === "game" ? gameController.statistics() : animeController.statistics()
     }
 
     ColumnLayout {
@@ -45,6 +46,27 @@ Item {
                 width: root.width
                 spacing: Theme.spacing
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    Repeater {
+                        model: [
+                            { id: "anime", label: qsTr("动漫") },
+                            { id: "game", label: qsTr("游戏") }
+                        ]
+
+                        delegate: NavButton {
+                            text: modelData.label
+                            active: statsSection === modelData.id
+                            onClicked: {
+                                statsSection = modelData.id
+                                refreshStats()
+                            }
+                        }
+                    }
+                }
+
                 GridLayout {
                     Layout.fillWidth: true
                     columns: 3
@@ -54,9 +76,9 @@ Item {
                     Repeater {
                         model: [
                             { label: qsTr("总作品数"), value: stats.totalCount, color: Theme.accent, icon: "book-open" },
-                            { label: qsTr("已看完"), value: stats.finishedCount, color: Theme.success, icon: "star" },
-                            { label: qsTr("在看"), value: stats.watchingCount, color: Theme.warning, icon: "film" },
-                            { label: qsTr("未看"), value: stats.plannedCount, color: Theme.textSecondary, icon: "inbox" },
+                            { label: statsSection === "game" ? qsTr("已玩完") : qsTr("已看完"), value: stats.finishedCount, color: Theme.success, icon: "star" },
+                            { label: statsSection === "game" ? qsTr("在玩") : qsTr("在看"), value: stats.watchingCount, color: Theme.warning, icon: statsSection === "game" ? "sparkles" : "film" },
+                            { label: statsSection === "game" ? qsTr("未玩") : qsTr("未看"), value: stats.plannedCount, color: Theme.textSecondary, icon: "inbox" },
                             { label: qsTr("弃坑"), value: stats.droppedCount, color: Theme.danger, icon: "trash-2" },
                             { label: qsTr("平均评分"), value: stats.averageScore, color: Theme.warning, icon: "chart-column" }
                         ]

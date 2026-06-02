@@ -8,25 +8,36 @@ Item {
     id: root
     objectName: "DetailPage"
 
-    required property int animeId
-    property var anime: ({})
+    property string section: "anime"
+    required property int workId
+    property var work: ({})
+
+    readonly property var ctrl: section === "game" ? gameController : animeController
+    readonly property var revModel: section === "game" ? gameReviewModel : reviewModel
+    readonly property bool isGame: section === "game"
+    readonly property string defaultStatus: isGame ? "未玩" : "未看"
 
     signal back()
-    signal editAnime(int animeId)
-    signal addReview(int animeId)
+    signal editWork(int workId)
+    signal addReview(int workId)
     signal editReview(int reviewId)
     signal deleted()
 
     function refresh() {
-        if (animeId > 0) {
-            anime = animeController.getAnime(animeId)
-            reviewModel.animeId = animeId
-            reviewModel.refresh()
+        if (workId > 0) {
+            work = isGame ? gameController.getGame(workId) : animeController.getAnime(workId)
+            if (isGame) {
+                gameReviewModel.gameId = workId
+                gameReviewModel.refresh()
+            } else {
+                reviewModel.animeId = workId
+                reviewModel.refresh()
+            }
         }
     }
 
     Component.onCompleted: refresh()
-    onAnimeIdChanged: refresh()
+    onWorkIdChanged: refresh()
     StackView.onActivated: refresh()
 
     ColumnLayout {
@@ -36,18 +47,18 @@ Item {
         PageBackBar {
             Layout.fillWidth: true
             backLabel: qsTr("← 返回首页")
-            title: anime.title || qsTr("作品详情")
+            title: work.title || (isGame ? qsTr("游戏详情") : qsTr("作品详情"))
             onBackClicked: root.back()
 
-            Button {
+            ActionButton {
                 text: qsTr("编辑")
-                flat: true
-                onClicked: root.editAnime(animeId)
+                actionType: "edit"
+                onClicked: root.editWork(workId)
             }
 
-            Button {
+            ActionButton {
                 text: qsTr("删除")
-                flat: true
+                actionType: "delete"
                 onClicked: deleteDialog.open()
             }
         }
@@ -83,7 +94,7 @@ Item {
                             id: detailCover
                             anchors.fill: parent
                             anchors.margins: 1
-                            source: anime.coverPath ? "file:///" + anime.coverPath.replace(/\\/g, "/") : ""
+                            source: work.coverPath ? "file:///" + work.coverPath.replace(/\\/g, "/") : ""
                             fillMode: Image.PreserveAspectFit
                             horizontalAlignment: Image.AlignHCenter
                             verticalAlignment: Image.AlignVCenter
@@ -92,7 +103,7 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            visible: !anime.coverPath || detailCover.status !== Image.Ready
+                            visible: !work.coverPath || detailCover.status !== Image.Ready
                             gradient: Gradient {
                                 orientation: Gradient.Vertical
                                 GradientStop { position: 0.0; color: Theme.accentMuted }
@@ -101,7 +112,7 @@ Item {
 
                             Icon {
                                 anchors.centerIn: parent
-                                iconSource: "film"
+                                iconSource: isGame ? "sparkles" : "film"
                                 size: 56
                                 iconOpacity: 0.3
                             }
@@ -113,7 +124,7 @@ Item {
                         spacing: 14
 
                         Label {
-                            text: anime.title || ""
+                            text: work.title || ""
                             font: Theme.titleFont
                             color: Theme.textPrimary
                             wrapMode: Text.WordWrap
@@ -142,7 +153,7 @@ Item {
                                     }
 
                                     Label {
-                                        text: anime.score > 0 ? anime.score.toFixed(1) : "—"
+                                        text: work.score > 0 ? work.score.toFixed(1) : "—"
                                         font: Theme.headingFont
                                         color: Theme.warning
                                     }
@@ -153,21 +164,21 @@ Item {
                                 implicitWidth: statusChip.implicitWidth + 20
                                 implicitHeight: 34
                                 radius: 17
-                                color: Theme.statusBgColor(anime.status || "未看")
-                                border.color: Theme.statusColor(anime.status || "未看")
+                                color: Theme.statusBgColor(work.status || defaultStatus)
+                                border.color: Theme.statusColor(work.status || defaultStatus)
                                 border.width: 1
 
                                 Label {
                                     id: statusChip
                                     anchors.centerIn: parent
-                                    text: anime.status || "未看"
+                                    text: work.status || defaultStatus
                                     font: Theme.bodyFont
-                                    color: Theme.statusColor(anime.status || "未看")
+                                    color: Theme.statusColor(work.status || defaultStatus)
                                 }
                             }
 
                             Rectangle {
-                                visible: (anime.bgmId || 0) > 0
+                                visible: (work.bgmId || 0) > 0
                                 implicitWidth: bgmChip.implicitWidth + 20
                                 implicitHeight: 34
                                 radius: 17
@@ -178,7 +189,7 @@ Item {
                                 Label {
                                     id: bgmChip
                                     anchors.centerIn: parent
-                                    text: qsTr("BGM #%1").arg(anime.bgmId)
+                                    text: qsTr("BGM #%1").arg(work.bgmId)
                                     font: Theme.captionFont
                                     color: Theme.accentHover
                                 }
@@ -189,7 +200,7 @@ Item {
                             Layout.fillWidth: true
                             spacing: 8
                             Repeater {
-                                model: anime.tags || []
+                                model: work.tags || []
                                 TagChip { tagName: modelData }
                             }
                         }
@@ -215,7 +226,7 @@ Item {
                                 }
 
                                 Label {
-                                    text: anime.description || qsTr("暂无简介")
+                                    text: work.description || qsTr("暂无简介")
                                     font: Theme.bodyFont
                                     color: Theme.textSecondary
                                     wrapMode: Text.WordWrap
@@ -242,7 +253,7 @@ Item {
                     Button {
                         text: qsTr("+ 写感想")
                         highlighted: true
-                        onClicked: root.addReview(animeId)
+                        onClicked: root.addReview(workId)
                     }
                 }
 
@@ -253,7 +264,7 @@ Item {
                     spacing: 8
 
                     Repeater {
-                        model: reviewModel
+                        model: revModel
 
                         delegate: ReviewItem {
                             Layout.fillWidth: true
@@ -263,14 +274,14 @@ Item {
                             content: model.content
                             onClicked: root.editReview(model.reviewId)
                             onDeleteRequested: {
-                                animeController.deleteReview(model.reviewId)
-                                reviewModel.refresh()
+                                ctrl.deleteReview(model.reviewId)
+                                revModel.refresh()
                             }
                         }
                     }
 
                     Label {
-                        visible: reviewModel.rowCount() === 0
+                        visible: revModel.rowCount() === 0
                         text: qsTr("还没有感想，点击上方按钮写下第一条吧。")
                         font: Theme.bodyFont
                         color: Theme.textSecondary
@@ -290,12 +301,12 @@ Item {
         standardButtons: Dialog.Yes | Dialog.No
 
         Label {
-            text: qsTr("确定要删除「%1」吗？所有感想也会一并删除。").arg(anime.title)
+            text: qsTr("确定要删除「%1」吗？所有感想也会一并删除。").arg(work.title)
             wrapMode: Text.WordWrap
         }
 
         onAccepted: {
-            if (animeController.deleteAnime(animeId)) {
+            if (isGame ? gameController.deleteGame(workId) : animeController.deleteAnime(workId)) {
                 root.deleted()
             }
         }

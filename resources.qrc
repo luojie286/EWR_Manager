@@ -20,6 +20,7 @@
         <file>qml/AppTheme/Theme.qml</file>
         <file>qml/AppTheme/qmldir</file>
         <file>qml/components/Icon.qml</file>
+        <file>qml/components/ActionButton.qml</file>
         <file>qml/components/EmptyState.qml</file>
         <file>qml/components/AnimeCard.qml</file>
         <file>qml/components/TagChip.qml</file>

@@ -2,6 +2,9 @@
 #include "AnimeListModel.h"
 #include "BangumiClient.h"
 #include "DatabaseManager.h"
+#include "GameController.h"
+#include "GameListModel.h"
+#include "GameReviewListModel.h"
 #include "ReviewListModel.h"
 
 #include <QGuiApplication>
@@ -30,29 +33,49 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    AnimeController controller;
-    controller.seedSampleData();
+    AnimeController animeController;
+    animeController.seedSampleData();
+
+    GameController gameController;
+    gameController.seedSampleData();
 
     AnimeListModel animeModel;
     ReviewListModel reviewModel;
-    BangumiClient bangumiClient(coversDir);
+    GameListModel gameModel;
+    GameReviewListModel gameReviewModel;
 
-    QObject::connect(&bangumiClient, &BangumiClient::localSyncFinished, &controller,
-                     [&controller, &animeModel](int localAnimeId, const QVariantMap &data) {
-                         controller.applyBangumiSync(localAnimeId, data);
+    BangumiClient bangumiClient(coversDir, 2);
+    BangumiClient gameBangumiClient(coversDir, 4);
+
+    QObject::connect(&bangumiClient, &BangumiClient::localSyncFinished, &animeController,
+                     [&animeController, &animeModel](int localAnimeId, const QVariantMap &data) {
+                         animeController.applyBangumiSync(localAnimeId, data);
                          animeModel.refresh();
                      });
     QObject::connect(&bangumiClient, &BangumiClient::localSyncBatchFinished, &animeModel,
                      [&animeModel]() { animeModel.refresh(); });
 
-    controller.syncPendingAnimeFromBangumi(&bangumiClient);
+    QObject::connect(&gameBangumiClient, &BangumiClient::gameLocalSyncFinished, &gameController,
+                     [&gameController, &gameModel](int localGameId, const QVariantMap &data) {
+                         gameController.applyBangumiSync(localGameId, data);
+                         gameModel.refresh();
+                     });
+    QObject::connect(&gameBangumiClient, &BangumiClient::gameLocalSyncBatchFinished, &gameModel,
+                     [&gameModel]() { gameModel.refresh(); });
+
+    animeController.syncPendingAnimeFromBangumi(&bangumiClient);
+    gameController.syncPendingGamesFromBangumi(&gameBangumiClient);
 
     QQmlApplicationEngine engine;
     engine.addImportPath(QStringLiteral("qrc:/qml"));
-    engine.rootContext()->setContextProperty(QStringLiteral("animeController"), &controller);
+    engine.rootContext()->setContextProperty(QStringLiteral("animeController"), &animeController);
+    engine.rootContext()->setContextProperty(QStringLiteral("gameController"), &gameController);
     engine.rootContext()->setContextProperty(QStringLiteral("animeModel"), &animeModel);
+    engine.rootContext()->setContextProperty(QStringLiteral("gameModel"), &gameModel);
     engine.rootContext()->setContextProperty(QStringLiteral("reviewModel"), &reviewModel);
+    engine.rootContext()->setContextProperty(QStringLiteral("gameReviewModel"), &gameReviewModel);
     engine.rootContext()->setContextProperty(QStringLiteral("bangumiClient"), &bangumiClient);
+    engine.rootContext()->setContextProperty(QStringLiteral("gameBangumiClient"), &gameBangumiClient);
 
     const QUrl url(QStringLiteral("qrc:/qml/main.qml"));
     QObject::connect(

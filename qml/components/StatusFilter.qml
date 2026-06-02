@@ -5,6 +5,7 @@ import AppTheme 1.0
 
 RowLayout {
     id: root
+    property string section: "anime"
     property string currentFilter: "全部"
 
     signal filterChanged(string filter)
@@ -12,7 +13,7 @@ RowLayout {
     spacing: 8
 
     Repeater {
-        model: animeController.statusOptions()
+        model: section === "game" ? gameController.statusOptions() : animeController.statusOptions()
         delegate: TagChip {
             tagName: modelData
             selected: root.currentFilter === modelData

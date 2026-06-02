@@ -15,8 +15,7 @@ ApplicationWindow {
     title: qsTr("EWR_Manager")
     color: Theme.background
 
-    property var currentAnime: ({})
-    property var currentReview: ({})
+    property string currentSection: "anime"
 
     background: Item {
         Rectangle {
@@ -104,13 +103,17 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
 
             NavButton {
-                text: qsTr("首页")
-                iconSource: "house"
-                active: stackView.depth <= 1
-                onClicked: {
-                    while (stackView.depth > 1)
-                        stackView.pop()
-                }
+                text: qsTr("动漫")
+                iconSource: "film"
+                active: currentSection === "anime" && stackView.depth <= 1
+                onClicked: switchSection("anime")
+            }
+
+            NavButton {
+                text: qsTr("游戏")
+                iconSource: "sparkles"
+                active: currentSection === "game" && stackView.depth <= 1
+                onClicked: switchSection("game")
             }
 
             NavButton {
@@ -122,10 +125,13 @@ ApplicationWindow {
 
             Button {
                 id: addButton
-                text: qsTr("添加作品")
+                text: currentSection === "game" ? qsTr("添加游戏") : qsTr("添加作品")
                 highlighted: true
                 font: Theme.bodyFont
-                onClicked: stackView.push(editPageComponent, { animeId: 0 })
+                onClicked: stackView.push(editPageComponent, {
+                    section: currentSection,
+                    workId: 0
+                })
 
                 contentItem: RowLayout {
                     spacing: 8
@@ -156,6 +162,15 @@ ApplicationWindow {
         }
     }
 
+    function switchSection(section) {
+        if (currentSection === section && stackView.depth <= 1)
+            return
+        currentSection = section
+        while (stackView.depth > 1)
+            stackView.pop()
+        stackView.replace(homePageComponent, { section: section })
+    }
+
     StackView {
         id: stackView
         anchors.fill: parent
@@ -175,13 +190,18 @@ ApplicationWindow {
     Component {
         id: homePageComponent
         HomePage {
-            onOpenAnime: function(animeId) {
-                currentAnime = animeController.getAnime(animeId)
-                reviewModel.animeId = animeId
-                stackView.push(detailPageComponent, { animeId: animeId })
+            section: root.currentSection
+            onOpenWork: function(workId) {
+                stackView.push(detailPageComponent, {
+                    section: currentSection,
+                    workId: workId
+                })
             }
-            onOpenEdit: function(animeId) {
-                stackView.push(editPageComponent, { animeId: animeId })
+            onOpenEdit: function(workId) {
+                stackView.push(editPageComponent, {
+                    section: currentSection,
+                    workId: workId
+                })
             }
         }
     }
@@ -190,20 +210,31 @@ ApplicationWindow {
         id: detailPageComponent
         DetailPage {
             onBack: stackView.pop()
-            onEditAnime: function(id) {
-                stackView.push(editPageComponent, { animeId: id })
+            onEditWork: function(id) {
+                stackView.push(editPageComponent, {
+                    section: currentSection,
+                    workId: id
+                })
             }
             onAddReview: function(id) {
-                stackView.push(reviewPageComponent, { animeId: id, reviewId: 0 })
+                stackView.push(reviewPageComponent, {
+                    section: currentSection,
+                    workId: id,
+                    reviewId: 0
+                })
             }
             onEditReview: function(reviewId) {
                 stackView.push(reviewPageComponent, {
-                    animeId: animeId,
+                    section: currentSection,
+                    workId: workId,
                     reviewId: reviewId
                 })
             }
             onDeleted: {
-                animeModel.refresh()
+                if (currentSection === "game")
+                    gameModel.refresh()
+                else
+                    animeModel.refresh()
                 stackView.pop()
             }
         }
@@ -214,7 +245,10 @@ ApplicationWindow {
         EditPage {
             onBack: stackView.pop()
             onSaved: {
-                animeModel.refresh()
+                if (currentSection === "game")
+                    gameModel.refresh()
+                else
+                    animeModel.refresh()
                 stackView.pop()
             }
         }
@@ -225,7 +259,10 @@ ApplicationWindow {
         ReviewPage {
             onBack: stackView.pop()
             onSaved: {
-                reviewModel.refresh()
+                if (currentSection === "game")
+                    gameReviewModel.refresh()
+                else
+                    reviewModel.refresh()
                 stackView.pop()
             }
         }

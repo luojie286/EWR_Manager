@@ -9,30 +9,36 @@ Item {
     id: root
     objectName: "EditPage"
 
-    property int animeId: 0
-    property bool isNew: animeId === 0
+    property string section: "anime"
+    property int workId: 0
+    property bool isNew: workId === 0
     property int bgmId: 0
+
+    readonly property var ctrl: section === "game" ? gameController : animeController
+    readonly property var bgmClient: section === "game" ? gameBangumiClient : bangumiClient
+    readonly property bool isGame: section === "game"
+    readonly property string defaultStatus: isGame ? "未玩" : "未看"
 
     signal back()
     signal saved()
 
-    property var anime: isNew ? {
+    property var work: isNew ? {
         title: "",
         score: 0,
-        status: "未看",
+        status: defaultStatus,
         description: "",
         coverPath: "",
         bgmId: 0,
         tags: []
-    } : animeController.getAnime(animeId)
+    } : (isGame ? gameController.getGame(workId) : animeController.getAnime(workId))
 
-    property string tagsText: (anime.tags || []).join(", ")
+    property string tagsText: (work.tags || []).join(", ")
 
     Component.onCompleted: {
         if (!isNew) {
-            anime = animeController.getAnime(animeId)
-            tagsText = (anime.tags || []).join(", ")
-            bgmId = anime.bgmId || 0
+            work = isGame ? gameController.getGame(workId) : animeController.getAnime(workId)
+            tagsText = (work.tags || []).join(", ")
+            bgmId = work.bgmId || 0
         }
     }
 
@@ -42,14 +48,16 @@ Item {
 
         PageBackBar {
             Layout.fillWidth: true
-            title: isNew ? qsTr("添加作品") : qsTr("编辑作品")
+            title: isNew
+                ? (isGame ? qsTr("添加游戏") : qsTr("添加作品"))
+                : (isGame ? qsTr("编辑游戏") : qsTr("编辑作品"))
             onBackClicked: root.back()
 
             Button {
                 text: qsTr("保存")
                 highlighted: true
-                enabled: titleField.text.trim().length > 0 && !bangumiClient.busy
-                onClicked: saveAnime()
+                enabled: titleField.text.trim().length > 0 && !bgmClient.busy
+                onClicked: saveWork()
             }
         }
 
@@ -73,8 +81,9 @@ Item {
                     Button {
                         text: qsTr("从 Bangumi 搜索")
                         Layout.fillWidth: true
-                        enabled: !bangumiClient.busy
+                        enabled: !bgmClient.busy
                         onClicked: {
+                            bangumiSearchDialog.section = root.section
                             bangumiSearchDialog.initialKeyword = titleField.text
                             bangumiSearchDialog.open()
                         }
@@ -127,8 +136,8 @@ Item {
                         TextField {
                             id: titleField
                             Layout.fillWidth: true
-                            text: anime.title || ""
-                            placeholderText: qsTr("例如：葬送的芙莉莲")
+                            text: work.title || ""
+                            placeholderText: isGame ? qsTr("例如：塞尔达传说") : qsTr("例如：葬送的芙莉莲")
                             color: Theme.textPrimary
                             background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
                         }
@@ -140,18 +149,22 @@ Item {
                             from: 0
                             to: 100
                             stepSize: 5
-                            value: Math.round((anime.score || 0) * 10)
+                            value: Math.round((work.score || 0) * 10)
                             editable: true
                             textFromValue: function(v) { return (v / 10).toFixed(1) }
                             valueFromText: function(t) { return Math.round(parseFloat(t) * 10) }
                         }
 
-                        Label { text: qsTr("观看状态"); color: Theme.textSecondary; font: Theme.captionFont }
+                        Label {
+                            text: isGame ? qsTr("游玩状态") : qsTr("观看状态")
+                            color: Theme.textSecondary
+                            font: Theme.captionFont
+                        }
                         ComboBox {
                             id: statusCombo
                             Layout.fillWidth: true
-                            model: ["未看", "在看", "看完", "弃坑"]
-                            currentIndex: Math.max(0, model.indexOf(anime.status || "未看"))
+                            model: isGame ? ["未玩", "在玩", "玩完", "弃坑"] : ["未看", "在看", "看完", "弃坑"]
+                            currentIndex: Math.max(0, model.indexOf(work.status || defaultStatus))
                         }
                     }
                 }
@@ -170,7 +183,7 @@ Item {
                         TextField {
                             id: coverPathField
                             Layout.fillWidth: true
-                            text: anime.coverPath || ""
+                            text: work.coverPath || ""
                             placeholderText: qsTr("选择本地图片，或从 Bangumi 自动下载")
                             color: Theme.textPrimary
                             background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
@@ -187,7 +200,7 @@ Item {
                         id: tagsField
                         Layout.fillWidth: true
                         text: tagsText
-                        placeholderText: qsTr("治愈, 奇幻, 公路片")
+                        placeholderText: isGame ? qsTr("RPG, 开放世界, 神作") : qsTr("治愈, 奇幻, 公路片")
                         color: Theme.textPrimary
                         background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
                     }
@@ -197,7 +210,7 @@ Item {
                         id: descField
                         Layout.fillWidth: true
                         Layout.preferredHeight: 160
-                        text: anime.description || ""
+                        text: work.description || ""
                         wrapMode: TextArea.Wrap
                         color: Theme.textPrimary
                         placeholderText: qsTr("写一段简介…")
@@ -212,8 +225,9 @@ Item {
 
     BangumiSearchDialog {
         id: bangumiSearchDialog
+        section: root.section
         onSubjectSelected: function(subjectId) {
-            bangumiClient.importSubject(subjectId)
+            bgmClient.importSubject(subjectId)
         }
     }
 
@@ -238,11 +252,11 @@ Item {
 
     BusyIndicator {
         anchors.centerIn: parent
-        running: bangumiClient.busy
+        running: bgmClient.busy
     }
 
     Connections {
-        target: bangumiClient
+        target: bgmClient
         function onImportFinished(data) {
             titleField.text = data.title || ""
             descField.text = data.description || ""
@@ -258,9 +272,8 @@ Item {
         }
     }
 
-    function saveAnime() {
+    function saveWork() {
         var data = {
-            animeId: animeId,
             title: titleField.text.trim(),
             score: scoreSpin.value / 10,
             status: statusCombo.currentText,
@@ -270,8 +283,15 @@ Item {
             tags: tagsField.text
         }
 
-        var ok = isNew ? (animeController.addAnime(data) > 0)
-                       : animeController.updateAnime(data)
+        var ok
+        if (isGame) {
+            data.gameId = workId
+            ok = isNew ? (gameController.addGame(data) > 0) : gameController.updateGame(data)
+        } else {
+            data.animeId = workId
+            ok = isNew ? (animeController.addAnime(data) > 0) : animeController.updateAnime(data)
+        }
+
         if (ok) {
             root.saved()
         }

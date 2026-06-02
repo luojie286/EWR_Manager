@@ -26,6 +26,25 @@ struct ReviewRecord {
     QString content;
 };
 
+struct GameRecord {
+    int id = 0;
+    QString title;
+    double score = 0.0;
+    QString status;
+    QString description;
+    QString coverPath;
+    int bgmId = 0;
+    QStringList tags;
+};
+
+struct GameReviewRecord {
+    int id = 0;
+    int gameId = 0;
+    QString date;
+    QString title;
+    QString content;
+};
+
 struct StatisticsRecord {
     int totalCount = 0;
     int finishedCount = 0;
@@ -69,11 +88,35 @@ public:
     bool setAnimeBgmId(int animeId, int bgmId);
     QVector<int> fetchAnimeIdsNeedingBangumiSync() const;
 
+    QVector<GameRecord> fetchAllGames(const QString &searchText = {},
+                                      const QString &statusFilter = {},
+                                      const QString &tagFilter = {}) const;
+    GameRecord fetchGame(int id) const;
+    int insertGame(const GameRecord &game);
+    bool updateGame(const GameRecord &game);
+    bool deleteGame(int id);
+
+    QVector<GameReviewRecord> fetchGameReviews(int gameId) const;
+    GameReviewRecord fetchGameReview(int id) const;
+    int insertGameReview(const GameReviewRecord &review);
+    bool updateGameReview(const GameReviewRecord &review);
+    bool deleteGameReview(int id);
+
+    QStringList fetchAllGameTags() const;
+    bool setGameTags(int gameId, const QStringList &tags);
+
+    StatisticsRecord fetchGameStatistics() const;
+
+    int findGameIdByTitle(const QString &title) const;
+    bool setGameBgmId(int gameId, int bgmId);
+    QVector<int> fetchGameIdsNeedingBangumiSync() const;
+
 private:
     explicit DatabaseManager(QObject *parent = nullptr);
     bool createTables();
     bool migrateSchema();
     QStringList fetchTagsForAnime(int animeId) const;
+    QStringList fetchTagsForGame(int gameId) const;
     int ensureTag(const QString &name) const;
 
     QSqlDatabase m_db;
