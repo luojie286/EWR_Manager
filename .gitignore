@@ -4,3 +4,16 @@ cmake-build-*/
 *.autosave
 .vs/
 *.db
+
+# 本地配置 / 密钥（切勿提交）
+.env
+.env.*
+!.env.example
+
+# 开发临时文件
+agent-tools/
+*.log
+
+# 系统与 IDE
+.DS_Store
+Thumbs.db
