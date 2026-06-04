@@ -19,6 +19,7 @@ public:
     Q_INVOKABLE int addGame(const QVariantMap &data);
     Q_INVOKABLE bool updateGame(const QVariantMap &data);
     Q_INVOKABLE bool deleteGame(int id);
+    Q_INVOKABLE bool deleteGameBatch(const QVariantList &ids);
 
     Q_INVOKABLE QVariantMap getReview(int id) const;
     Q_INVOKABLE int addReview(const QVariantMap &data);

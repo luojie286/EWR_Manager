@@ -12,12 +12,54 @@ Item {
     property string status: ""
     property string coverPath: ""
     property var tags: []
+    property bool selectionMode: false
+    property bool selected: false
 
     signal clicked()
     signal editRequested()
+    signal selectionToggled()
 
     width: Theme.cardWidth
     height: Theme.cardHeight
+
+    TextMetrics {
+        id: tagMetrics
+        font: Theme.captionFont
+    }
+
+    readonly property int tagChipHeight: 24
+    readonly property int tagSpacing: 4
+    readonly property real tagFlowMaxHeight: Theme.cardInfoHeight - 56 - 20
+    readonly property real tagFlowWidth: cardBody.width - 20
+
+    readonly property var visibleTags: {
+        var result = []
+        var x = 0
+        var y = 0
+        var maxW = tagFlowWidth
+        var maxH = tagFlowMaxHeight
+        if (maxW <= 0 || maxH <= 0 || !tags || tags.length === 0)
+            return result
+
+        for (var i = 0; i < tags.length; i++) {
+            tagMetrics.text = tags[i]
+            var w = tagMetrics.width + 18
+            if (w > maxW)
+                continue
+
+            if (x > 0 && x + tagSpacing + w > maxW) {
+                y += tagChipHeight + tagSpacing
+                x = 0
+            }
+
+            if (y + tagChipHeight > maxH)
+                break
+
+            result.push(tags[i])
+            x += (x > 0 ? tagSpacing : 0) + w
+        }
+        return result
+    }
 
     scale: cardMouse.containsMouse ? 1.02 : 1.0
     transformOrigin: Item.Top
@@ -52,21 +94,15 @@ Item {
             color: "#0a0c10"
             clip: true
 
-            Image {
-                id: coverImage
+            CoverImage {
+                id: coverDisplay
                 anchors.fill: parent
                 source: coverPath ? "file:///" + coverPath.replace(/\\/g, "/") : ""
-                fillMode: Image.PreserveAspectFit
-                horizontalAlignment: Image.AlignHCenter
-                verticalAlignment: Image.AlignVCenter
-                visible: coverImage.status === Image.Ready
-
-                Behavior on opacity { NumberAnimation { duration: 200 } }
             }
 
             Rectangle {
                 anchors.fill: parent
-                visible: !coverPath || coverImage.status !== Image.Ready
+                visible: !coverPath || !coverDisplay.ready
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: Theme.accentMuted }
@@ -114,6 +150,7 @@ Item {
                 border.color: Theme.statusColor(status)
                 border.width: 1
                 opacity: 0.92
+                visible: !selectionMode
 
                 Label {
                     id: statusPill
@@ -121,6 +158,28 @@ Item {
                     text: status
                     font: Theme.labelFont
                     color: Theme.statusColor(status)
+                }
+            }
+
+            Rectangle {
+                visible: selectionMode
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: 10
+                width: 26
+                height: 26
+                radius: 8
+                color: selected ? Theme.accent : "#66000000"
+                border.color: selected ? Theme.accentHover : Theme.border
+                border.width: 2
+
+                Label {
+                    anchors.centerIn: parent
+                    visible: selected
+                    text: "✓"
+                    font.pixelSize: 14
+                    font.weight: Font.Bold
+                    color: "#ffffff"
                 }
             }
         }
@@ -164,6 +223,7 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 ActionButton {
+                    visible: !selectionMode
                     actionType: "edit"
                     compact: true
                     ToolTip.text: qsTr("编辑")
@@ -175,12 +235,11 @@ Item {
             Flow {
                 id: tagFlow
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(implicitHeight, 52)
-                clip: true
-                spacing: 4
+                Layout.preferredHeight: visibleTags.length > 0 ? implicitHeight : 0
+                spacing: root.tagSpacing
 
                 Repeater {
-                    model: tags.slice(0, 3)
+                    model: root.visibleTags
                     TagChip {
                         compact: true
                         tagName: modelData
@@ -194,6 +253,6 @@ Item {
         id: cardMouse
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: root.clicked()
+        onClicked: selectionMode ? root.selectionToggled() : root.clicked()
     }
 }

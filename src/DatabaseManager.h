@@ -64,6 +64,12 @@ public:
 
     bool initialize(const QString &dbPath);
     bool isReady() const { return m_ready; }
+    QString databasePath() const { return m_db.databaseName(); }
+
+    bool isAnimeSampleSeeded() const;
+    bool isGameSampleSeeded() const;
+    void setAnimeSampleSeeded();
+    void setGameSampleSeeded();
 
     QVector<AnimeRecord> fetchAllAnime(const QString &searchText = {},
                                        const QString &statusFilter = {},
@@ -72,6 +78,7 @@ public:
     int insertAnime(const AnimeRecord &anime);
     bool updateAnime(const AnimeRecord &anime);
     bool deleteAnime(int id);
+    bool deleteAnimeBatch(const QVector<int> &ids);
 
     QVector<ReviewRecord> fetchReviews(int animeId) const;
     ReviewRecord fetchReview(int id) const;
@@ -95,6 +102,7 @@ public:
     int insertGame(const GameRecord &game);
     bool updateGame(const GameRecord &game);
     bool deleteGame(int id);
+    bool deleteGameBatch(const QVector<int> &ids);
 
     QVector<GameReviewRecord> fetchGameReviews(int gameId) const;
     GameReviewRecord fetchGameReview(int id) const;
@@ -107,6 +115,8 @@ public:
 
     StatisticsRecord fetchGameStatistics() const;
 
+    void cleanupOrphanRecords();
+
     int findGameIdByTitle(const QString &title) const;
     bool setGameBgmId(int gameId, int bgmId);
     QVector<int> fetchGameIdsNeedingBangumiSync() const;
@@ -115,10 +125,16 @@ private:
     explicit DatabaseManager(QObject *parent = nullptr);
     bool createTables();
     bool migrateSchema();
+    bool ensureAppSettingsTable();
+    bool appSettingFlag(const QString &key) const;
+    void setAppSettingFlag(const QString &key);
+    void migrateSampleSeedFlags();
+    void enableForeignKeys();
     QStringList fetchTagsForAnime(int animeId) const;
     QStringList fetchTagsForGame(int gameId) const;
     int ensureTag(const QString &name) const;
 
     QSqlDatabase m_db;
     bool m_ready = false;
+    bool m_existingDatabaseFile = false;
 };

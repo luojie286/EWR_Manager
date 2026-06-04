@@ -20,6 +20,9 @@ DatabaseManager::DatabaseManager(QObject *parent)
 
 bool DatabaseManager::initialize(const QString &dbPath)
 {
+    m_existingDatabaseFile =
+        QFileInfo::exists(dbPath) && QFileInfo(dbPath).size() > 0;
+
     if (QSqlDatabase::contains(QStringLiteral("anime_connection"))) {
         m_db = QSqlDatabase::database(QStringLiteral("anime_connection"));
     } else {
@@ -38,7 +41,12 @@ bool DatabaseManager::initialize(const QString &dbPath)
         return false;
     }
 
+    enableForeignKeys();
+
     m_ready = createTables();
+    if (m_ready) {
+        cleanupOrphanRecords();
+    }
     return m_ready;
 }
 
@@ -161,7 +169,124 @@ bool DatabaseManager::migrateSchema()
         }
     }
 
+    if (!ensureAppSettingsTable()) {
+        return false;
+    }
+
+    migrateSampleSeedFlags();
+
     return true;
+}
+
+void DatabaseManager::enableForeignKeys()
+{
+    QSqlQuery query(m_db);
+    query.exec(QStringLiteral("PRAGMA foreign_keys = ON"));
+}
+
+void DatabaseManager::cleanupOrphanRecords()
+{
+    if (!m_ready) {
+        return;
+    }
+
+    QSqlQuery query(m_db);
+    query.exec(QStringLiteral("DELETE FROM anime_tag WHERE anime_id NOT IN (SELECT id FROM anime)"));
+    query.exec(QStringLiteral("DELETE FROM game_tag WHERE game_id NOT IN (SELECT id FROM game)"));
+    query.exec(QStringLiteral("DELETE FROM review WHERE anime_id NOT IN (SELECT id FROM anime)"));
+    query.exec(QStringLiteral("DELETE FROM game_review WHERE game_id NOT IN (SELECT id FROM game)"));
+    query.exec(QStringLiteral(
+        "DELETE FROM tag WHERE id NOT IN ("
+        "SELECT tag_id FROM anime_tag UNION SELECT tag_id FROM game_tag)"));
+}
+
+bool DatabaseManager::ensureAppSettingsTable()
+{
+    QSqlQuery query(m_db);
+    return query.exec(QStringLiteral(
+        "CREATE TABLE IF NOT EXISTS app_settings ("
+        "key TEXT PRIMARY KEY,"
+        "value TEXT NOT NULL"
+        ")"));
+}
+
+bool DatabaseManager::appSettingFlag(const QString &key) const
+{
+    if (!m_ready) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT value FROM app_settings WHERE key = :key"));
+    query.bindValue(QStringLiteral(":key"), key);
+    if (!query.exec() || !query.next()) {
+        return false;
+    }
+
+    return query.value(0).toString() == QStringLiteral("1");
+}
+
+void DatabaseManager::setAppSettingFlag(const QString &key)
+{
+    if (!m_ready) {
+        return;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES (:key, '1')"));
+    query.bindValue(QStringLiteral(":key"), key);
+    query.exec();
+}
+
+bool DatabaseManager::isAnimeSampleSeeded() const
+{
+    return appSettingFlag(QStringLiteral("anime_sample_seeded"));
+}
+
+bool DatabaseManager::isGameSampleSeeded() const
+{
+    return appSettingFlag(QStringLiteral("game_sample_seeded"));
+}
+
+void DatabaseManager::setAnimeSampleSeeded()
+{
+    setAppSettingFlag(QStringLiteral("anime_sample_seeded"));
+}
+
+void DatabaseManager::setGameSampleSeeded()
+{
+    setAppSettingFlag(QStringLiteral("game_sample_seeded"));
+}
+
+void DatabaseManager::migrateSampleSeedFlags()
+{
+    if (!m_ready) {
+        return;
+    }
+
+    auto countRows = [&](const QString &table) -> int {
+        QSqlQuery query(m_db);
+        if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM ") + table) || !query.next()) {
+            return 0;
+        }
+        return query.value(0).toInt();
+    };
+
+    const int animeCount = countRows(QStringLiteral("anime"));
+    const int gameCount = countRows(QStringLiteral("game"));
+
+    if (!isAnimeSampleSeeded()) {
+        if (animeCount > 0 || m_existingDatabaseFile) {
+            setAnimeSampleSeeded();
+        }
+    }
+
+    if (!isGameSampleSeeded()) {
+        if (gameCount > 0 || m_existingDatabaseFile) {
+            setGameSampleSeeded();
+        }
+    }
 }
 
 QVector<AnimeRecord> DatabaseManager::fetchAllAnime(const QString &searchText,
@@ -322,7 +447,51 @@ bool DatabaseManager::deleteAnime(int id)
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral("DELETE FROM anime WHERE id = :id"));
     query.bindValue(QStringLiteral(":id"), id);
-    return query.exec();
+    if (!query.exec()) {
+        return false;
+    }
+
+    cleanupOrphanRecords();
+    return true;
+}
+
+bool DatabaseManager::deleteAnimeBatch(const QVector<int> &ids)
+{
+    if (!m_ready || ids.isEmpty()) {
+        return false;
+    }
+
+    if (!m_db.transaction()) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("DELETE FROM anime WHERE id = :id"));
+
+    bool deletedAny = false;
+    for (int id : ids) {
+        if (id <= 0) {
+            continue;
+        }
+        query.bindValue(QStringLiteral(":id"), id);
+        if (!query.exec()) {
+            m_db.rollback();
+            return false;
+        }
+        deletedAny = true;
+    }
+
+    if (!deletedAny) {
+        m_db.rollback();
+        return false;
+    }
+
+    if (!m_db.commit()) {
+        return false;
+    }
+
+    cleanupOrphanRecords();
+    return true;
 }
 
 QVector<ReviewRecord> DatabaseManager::fetchReviews(int animeId) const
@@ -527,13 +696,14 @@ StatisticsRecord DatabaseManager::fetchStatistics() const
     }
 
     if (query.exec(QStringLiteral(
-            "SELECT t.name, COUNT(*) AS cnt FROM tag t "
+            "SELECT t.name, COUNT(*) AS tag_count FROM tag t "
             "JOIN anime_tag at ON t.id = at.tag_id "
-            "GROUP BY t.id ORDER BY cnt DESC, t.name COLLATE NOCASE ASC LIMIT 20"))) {
+            "JOIN anime a ON a.id = at.anime_id "
+            "GROUP BY t.id ORDER BY tag_count DESC, t.name COLLATE NOCASE ASC LIMIT 20"))) {
         while (query.next()) {
             QVariantMap item;
             item.insert(QStringLiteral("name"), query.value(0).toString());
-            item.insert(QStringLiteral("count"), query.value(1).toInt());
+            item.insert(QStringLiteral("tagCount"), query.value(1).toInt());
             stats.tagRanking.append(item);
         }
     }
@@ -789,7 +959,51 @@ bool DatabaseManager::deleteGame(int id)
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral("DELETE FROM game WHERE id = :id"));
     query.bindValue(QStringLiteral(":id"), id);
-    return query.exec();
+    if (!query.exec()) {
+        return false;
+    }
+
+    cleanupOrphanRecords();
+    return true;
+}
+
+bool DatabaseManager::deleteGameBatch(const QVector<int> &ids)
+{
+    if (!m_ready || ids.isEmpty()) {
+        return false;
+    }
+
+    if (!m_db.transaction()) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("DELETE FROM game WHERE id = :id"));
+
+    bool deletedAny = false;
+    for (int id : ids) {
+        if (id <= 0) {
+            continue;
+        }
+        query.bindValue(QStringLiteral(":id"), id);
+        if (!query.exec()) {
+            m_db.rollback();
+            return false;
+        }
+        deletedAny = true;
+    }
+
+    if (!deletedAny) {
+        m_db.rollback();
+        return false;
+    }
+
+    if (!m_db.commit()) {
+        return false;
+    }
+
+    cleanupOrphanRecords();
+    return true;
 }
 
 QVector<GameReviewRecord> DatabaseManager::fetchGameReviews(int gameId) const
@@ -997,13 +1211,14 @@ StatisticsRecord DatabaseManager::fetchGameStatistics() const
     }
 
     if (query.exec(QStringLiteral(
-            "SELECT t.name, COUNT(*) AS cnt FROM tag t "
+            "SELECT t.name, COUNT(*) AS tag_count FROM tag t "
             "JOIN game_tag gt ON t.id = gt.tag_id "
-            "GROUP BY t.id ORDER BY cnt DESC, t.name COLLATE NOCASE ASC LIMIT 20"))) {
+            "JOIN game g ON g.id = gt.game_id "
+            "GROUP BY t.id ORDER BY tag_count DESC, t.name COLLATE NOCASE ASC LIMIT 20"))) {
         while (query.next()) {
             QVariantMap item;
             item.insert(QStringLiteral("name"), query.value(0).toString());
-            item.insert(QStringLiteral("count"), query.value(1).toInt());
+            item.insert(QStringLiteral("tagCount"), query.value(1).toInt());
             stats.tagRanking.append(item);
         }
     }

@@ -32,6 +32,20 @@ bool AnimeController::deleteAnime(int id)
     return DatabaseManager::instance().deleteAnime(id);
 }
 
+bool AnimeController::deleteAnimeBatch(const QVariantList &ids)
+{
+    QVector<int> batch;
+    batch.reserve(ids.size());
+    for (const QVariant &value : ids) {
+        bool ok = false;
+        const int id = value.toInt(&ok);
+        if (ok && id > 0) {
+            batch.append(id);
+        }
+    }
+    return DatabaseManager::instance().deleteAnimeBatch(batch);
+}
+
 QVariantMap AnimeController::getReview(int id) const
 {
     return reviewToMap(DatabaseManager::instance().fetchReview(id));
@@ -55,6 +69,11 @@ bool AnimeController::deleteReview(int id)
 QStringList AnimeController::allTags() const
 {
     return DatabaseManager::instance().fetchAllTags();
+}
+
+void AnimeController::cleanupDatabase() const
+{
+    DatabaseManager::instance().cleanupOrphanRecords();
 }
 
 QVariantMap AnimeController::statistics() const
@@ -83,7 +102,7 @@ QStringList AnimeController::statusOptions() const
 
 void AnimeController::seedSampleData()
 {
-    if (DatabaseManager::instance().fetchAllAnime().size() > 0) {
+    if (DatabaseManager::instance().isAnimeSampleSeeded()) {
         return;
     }
 
@@ -160,6 +179,8 @@ void AnimeController::seedSampleData()
             DatabaseManager::instance().insertReview(r3);
         }
     }
+
+    DatabaseManager::instance().setAnimeSampleSeeded();
 }
 
 void AnimeController::linkSampleBangumiIds()

@@ -51,12 +51,14 @@ Item {
             onBackClicked: root.back()
 
             ActionButton {
+                Layout.preferredHeight: 38
                 text: qsTr("编辑")
                 actionType: "edit"
                 onClicked: root.editWork(workId)
             }
 
             ActionButton {
+                Layout.preferredHeight: 38
                 text: qsTr("删除")
                 actionType: "delete"
                 onClicked: deleteDialog.open()
@@ -90,20 +92,16 @@ Item {
                         border.color: Theme.borderLight
                         border.width: 1
 
-                        Image {
-                            id: detailCover
+                        CoverImage {
+                            id: detailCoverDisplay
                             anchors.fill: parent
                             anchors.margins: 1
                             source: work.coverPath ? "file:///" + work.coverPath.replace(/\\/g, "/") : ""
-                            fillMode: Image.PreserveAspectFit
-                            horizontalAlignment: Image.AlignHCenter
-                            verticalAlignment: Image.AlignVCenter
-                            visible: detailCover.status === Image.Ready
                         }
 
                         Rectangle {
                             anchors.fill: parent
-                            visible: !work.coverPath || detailCover.status !== Image.Ready
+                            visible: !work.coverPath || !detailCoverDisplay.ready
                             gradient: Gradient {
                                 orientation: Gradient.Vertical
                                 GradientStop { position: 0.0; color: Theme.accentMuted }

@@ -17,37 +17,8 @@ ApplicationWindow {
 
     property string currentSection: "anime"
 
-    background: Item {
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Theme.background }
-                GradientStop { position: 0.45; color: Theme.backgroundAlt }
-                GradientStop { position: 1.0; color: "#0d1018" }
-            }
-        }
-
-        Rectangle {
-            width: 520
-            height: 520
-            x: -180
-            y: -120
-            radius: width / 2
-            color: Theme.accent
-            opacity: 0.06
-        }
-
-        Rectangle {
-            width: 420
-            height: 420
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.rightMargin: -100
-            anchors.bottomMargin: -80
-            radius: width / 2
-            color: "#5b8def"
-            opacity: 0.05
-        }
+    background: ParticleBackground {
+        anchors.fill: parent
     }
 
     header: Rectangle {
@@ -120,7 +91,12 @@ ApplicationWindow {
                 text: qsTr("统计")
                 iconSource: "chart-column"
                 active: stackView.currentItem && stackView.currentItem.objectName === "StatisticsPage"
-                onClicked: stackView.push(statisticsPageComponent)
+                onClicked: openStatistics()
+            }
+
+            MusicPlayerBar {
+                Layout.minimumWidth: 300
+                Layout.preferredWidth: 320
             }
 
             Button {
@@ -171,6 +147,14 @@ ApplicationWindow {
         stackView.replace(homePageComponent, { section: section })
     }
 
+    function openStatistics() {
+        while (stackView.depth > 1)
+            stackView.pop()
+        var page = stackView.push(statisticsPageComponent)
+        if (page && page.refreshStats)
+            page.refreshStats()
+    }
+
     StackView {
         id: stackView
         anchors.fill: parent
@@ -187,10 +171,18 @@ ApplicationWindow {
         }
     }
 
+    function refreshStatisticsIfVisible() {
+        if (stackView.currentItem && stackView.currentItem.objectName === "StatisticsPage"
+                && stackView.currentItem.refreshStats) {
+            stackView.currentItem.refreshStats()
+        }
+    }
+
     Component {
         id: homePageComponent
         HomePage {
             section: root.currentSection
+            onWorksDeleted: refreshStatisticsIfVisible()
             onOpenWork: function(workId) {
                 stackView.push(detailPageComponent, {
                     section: currentSection,
@@ -236,6 +228,7 @@ ApplicationWindow {
                 else
                     animeModel.refresh()
                 stackView.pop()
+                refreshStatisticsIfVisible()
             }
         }
     }

@@ -21,10 +21,15 @@ if (-not (Test-Path $windeployqt)) {
 }
 
 if ($ExePath -eq "") {
+    $buildRoot = Join-Path $PSScriptRoot "..\build"
     $candidates = @(
-        (Join-Path $PSScriptRoot "..\build\EWR_Manager.exe"),
-        (Join-Path $PSScriptRoot "..\build\Desktop_Qt_6_10_2_MinGW_64_bit-Debug\EWR_Manager.exe")
+        (Join-Path $buildRoot "EWR_Manager.exe")
     )
+    if (Test-Path $buildRoot) {
+        $candidates += Get-ChildItem -Path $buildRoot -Recurse -Filter "EWR_Manager.exe" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            ForEach-Object { $_.FullName }
+    }
     foreach ($c in $candidates) {
         $resolved = Resolve-Path $c -ErrorAction SilentlyContinue
         if ($resolved) {

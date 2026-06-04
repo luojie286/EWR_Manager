@@ -32,6 +32,20 @@ bool GameController::deleteGame(int id)
     return DatabaseManager::instance().deleteGame(id);
 }
 
+bool GameController::deleteGameBatch(const QVariantList &ids)
+{
+    QVector<int> batch;
+    batch.reserve(ids.size());
+    for (const QVariant &value : ids) {
+        bool ok = false;
+        const int id = value.toInt(&ok);
+        if (ok && id > 0) {
+            batch.append(id);
+        }
+    }
+    return DatabaseManager::instance().deleteGameBatch(batch);
+}
+
 QVariantMap GameController::getReview(int id) const
 {
     return reviewToMap(DatabaseManager::instance().fetchGameReview(id));
@@ -83,7 +97,7 @@ QStringList GameController::statusOptions() const
 
 void GameController::seedSampleData()
 {
-    if (DatabaseManager::instance().fetchAllGames().size() > 0) {
+    if (DatabaseManager::instance().isGameSampleSeeded()) {
         return;
     }
 
@@ -140,6 +154,8 @@ void GameController::seedSampleData()
             DatabaseManager::instance().insertGameReview(r1);
         }
     }
+
+    DatabaseManager::instance().setGameSampleSeeded();
 }
 
 void GameController::linkSampleBangumiIds()

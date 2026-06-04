@@ -19,6 +19,7 @@ public:
     Q_INVOKABLE int addAnime(const QVariantMap &data);
     Q_INVOKABLE bool updateAnime(const QVariantMap &data);
     Q_INVOKABLE bool deleteAnime(int id);
+    Q_INVOKABLE bool deleteAnimeBatch(const QVariantList &ids);
 
     Q_INVOKABLE QVariantMap getReview(int id) const;
     Q_INVOKABLE int addReview(const QVariantMap &data);
@@ -29,6 +30,7 @@ public:
     Q_INVOKABLE QVariantMap statistics() const;
     Q_INVOKABLE QStringList statusOptions() const;
     Q_INVOKABLE void seedSampleData();
+    Q_INVOKABLE void cleanupDatabase() const;
 
     void linkSampleBangumiIds();
     bool applyBangumiSync(int localAnimeId, const QVariantMap &data);

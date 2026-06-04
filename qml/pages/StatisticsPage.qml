@@ -11,13 +11,18 @@ Item {
     signal back()
 
     property string statsSection: "anime"
-    property var stats: statsSection === "game" ? gameController.statistics() : animeController.statistics()
+    property var stats: ({})
+    property var tagRanking: []
 
     Component.onCompleted: refreshStats()
     StackView.onActivated: refreshStats()
+    onStatsSectionChanged: refreshStats()
 
     function refreshStats() {
-        stats = statsSection === "game" ? gameController.statistics() : animeController.statistics()
+        animeController.cleanupDatabase()
+        var data = statsSection === "game" ? gameController.statistics() : animeController.statistics()
+        stats = data
+        tagRanking = (data.tagRanking || []).slice()
     }
 
     ColumnLayout {
@@ -153,7 +158,8 @@ Item {
                         spacing: 10
 
                         Repeater {
-                            model: stats.tagRanking || []
+                            id: tagRankingRepeater
+                            model: tagRanking
 
                             delegate: RowLayout {
                                 width: parent.width
@@ -196,9 +202,9 @@ Item {
                                     Rectangle {
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: {
-                                            var maxCount = stats.tagRanking.length > 0
-                                                ? stats.tagRanking[0].count : 1
-                                            return parent.width * (modelData.count / maxCount)
+                                            var maxCount = tagRanking.length > 0
+                                                ? tagRanking[0].tagCount : 1
+                                            return parent.width * (modelData.tagCount / maxCount)
                                         }
                                         height: 10
                                         radius: 5
@@ -211,7 +217,7 @@ Item {
                                 }
 
                                 Label {
-                                    text: modelData.count
+                                    text: modelData.tagCount
                                     color: Theme.textSecondary
                                     font: Theme.captionFont
                                 }
@@ -220,7 +226,7 @@ Item {
 
                         EmptyState {
                             width: parent.width
-                            visible: !stats.tagRanking || stats.tagRanking.length === 0
+                            visible: tagRanking.length === 0
                             iconSource: "tag"
                             title: qsTr("暂无标签数据")
                             subtitle: qsTr("给作品添加标签后，这里会显示使用频率排行")

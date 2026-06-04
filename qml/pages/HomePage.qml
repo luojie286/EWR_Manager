@@ -19,6 +19,57 @@ Item {
 
     signal openWork(int workId)
     signal openEdit(int workId)
+    signal worksDeleted()
+
+    property bool batchMode: false
+    property var selectedIds: []
+
+    readonly property int selectedCount: selectedIds.length
+
+    function isSelected(workId) {
+        return selectedIds.indexOf(workId) >= 0
+    }
+
+    function toggleSelection(workId) {
+        var idx = selectedIds.indexOf(workId)
+        if (idx >= 0)
+            selectedIds = selectedIds.slice(0, idx).concat(selectedIds.slice(idx + 1))
+        else
+            selectedIds = selectedIds.concat([workId])
+    }
+
+    function clearSelection() {
+        selectedIds = []
+    }
+
+    function exitBatchMode() {
+        batchMode = false
+        clearSelection()
+    }
+
+    function selectAllVisible() {
+        var ids = []
+        for (var i = 0; i < listModel.rowCount(); i++) {
+            var item = listModel.get(i)
+            ids.push(isGame ? item.gameId : item.animeId)
+        }
+        selectedIds = ids
+    }
+
+    function performBatchDelete() {
+        if (selectedCount === 0)
+            return
+        var ok = isGame
+            ? gameController.deleteGameBatch(selectedIds)
+            : animeController.deleteAnimeBatch(selectedIds)
+        if (ok) {
+            exitBatchMode()
+            listModel.refresh()
+            root.worksDeleted()
+        }
+    }
+
+    onSectionChanged: exitBatchMode()
 
     ColumnLayout {
         anchors.fill: parent
@@ -102,6 +153,53 @@ Item {
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            visible: batchMode
+            radius: Theme.radius
+            color: Theme.surface
+            border.color: Theme.borderLight
+            border.width: 1
+            implicitHeight: batchBar.implicitHeight + 20
+
+            RowLayout {
+                id: batchBar
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 10
+
+                Label {
+                    text: selectedCount > 0
+                        ? qsTr("已选 %1 项").arg(selectedCount)
+                        : qsTr("请选择要删除的条目")
+                    font: Theme.bodyFont
+                    color: Theme.textPrimary
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Button {
+                    text: qsTr("全选")
+                    font: Theme.bodyFont
+                    enabled: listModel.rowCount() > 0
+                    onClicked: selectAllVisible()
+                }
+
+                Button {
+                    text: qsTr("取消")
+                    font: Theme.bodyFont
+                    onClicked: exitBatchMode()
+                }
+
+                ActionButton {
+                    text: qsTr("删除")
+                    actionType: "delete"
+                    enabled: selectedCount > 0
+                    onClicked: batchDeleteDialog.open()
+                }
+            }
+        }
+
         RowLayout {
             Layout.fillWidth: true
 
@@ -128,6 +226,16 @@ Item {
                     text: qsTr("已筛选")
                     font: Theme.labelFont
                     color: Theme.accent
+                }
+            }
+
+            Button {
+                visible: !batchMode && listModel.rowCount() > 0
+                text: qsTr("批量管理")
+                font: Theme.bodyFont
+                onClicked: {
+                    clearSelection()
+                    batchMode = true
                 }
             }
         }
@@ -170,9 +278,12 @@ Item {
                         status: model.status
                         coverPath: model.coverPath
                         tags: model.tags
+                        selectionMode: root.batchMode
+                        selected: root.isSelected(workId)
 
                         onClicked: root.openWork(workId)
                         onEditRequested: root.openEdit(workId)
+                        onSelectionToggled: root.toggleSelection(workId)
                     }
                 }
             }
@@ -198,5 +309,22 @@ Item {
         function onSearchTextChanged() {
             tagCombo.model = [qsTr("全部标签")].concat(ctrl.allTags())
         }
+    }
+
+    Dialog {
+        id: batchDeleteDialog
+        title: qsTr("确认批量删除")
+        modal: true
+        anchors.centerIn: parent
+        standardButtons: Dialog.Yes | Dialog.No
+
+        Label {
+            text: isGame
+                ? qsTr("确定要删除选中的 %1 部游戏吗？相关感想也会一并删除。").arg(selectedCount)
+                : qsTr("确定要删除选中的 %1 部作品吗？相关感想也会一并删除。").arg(selectedCount)
+            wrapMode: Text.WordWrap
+        }
+
+        onAccepted: performBatchDelete()
     }
 }

@@ -16,9 +16,21 @@
         <file alias="icons/inbox.svg">resources/icons/inbox.svg</file>
         <file alias="icons/save.svg">resources/icons/save.svg</file>
         <file alias="icons/pen-line.svg">resources/icons/pen-line.svg</file>
+        <file alias="icons/folder-open.svg">resources/icons/folder-open.svg</file>
+        <file alias="icons/music.svg">resources/icons/music.svg</file>
+        <file alias="icons/play.svg">resources/icons/play.svg</file>
+        <file alias="icons/pause.svg">resources/icons/pause.svg</file>
+        <file alias="icons/skip-forward.svg">resources/icons/skip-forward.svg</file>
+        <file alias="icons/volume-2.svg">resources/icons/volume-2.svg</file>
+        <file alias="icons/volume-x.svg">resources/icons/volume-x.svg</file>
         <file>qml/main.qml</file>
         <file>qml/AppTheme/Theme.qml</file>
         <file>qml/AppTheme/qmldir</file>
+        <file>qml/components/CoverImage.qml</file>
+        <file>qml/components/ParticleBackground.qml</file>
+        <file>qml/components/MusicPlayerBar.qml</file>
+        <file>qml/components/MusicIconButton.qml</file>
+        <file>qml/components/MusicSettingsDialog.qml</file>
         <file>qml/components/Icon.qml</file>
         <file>qml/components/ActionButton.qml</file>
         <file>qml/components/EmptyState.qml</file>
@@ -29,6 +41,7 @@
         <file>qml/components/NavButton.qml</file>
         <file>qml/components/PageBackBar.qml</file>
         <file>qml/components/BangumiSearchDialog.qml</file>
+        <file>qml/components/RawgSearchDialog.qml</file>
         <file>qml/pages/HomePage.qml</file>
         <file>qml/pages/DetailPage.qml</file>
         <file>qml/pages/EditPage.qml</file>

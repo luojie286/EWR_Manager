@@ -15,9 +15,11 @@ Item {
     property int bgmId: 0
 
     readonly property var ctrl: section === "game" ? gameController : animeController
-    readonly property var bgmClient: section === "game" ? gameBangumiClient : bangumiClient
     readonly property bool isGame: section === "game"
     readonly property string defaultStatus: isGame ? "未玩" : "未看"
+    readonly property bool importBusy: isGame
+        ? (rawgClient.busy || gameBangumiClient.busy)
+        : bangumiClient.busy
 
     signal back()
     signal saved()
@@ -56,7 +58,7 @@ Item {
             Button {
                 text: qsTr("保存")
                 highlighted: true
-                enabled: titleField.text.trim().length > 0 && !bgmClient.busy
+                enabled: titleField.text.trim().length > 0 && !importBusy
                 onClicked: saveWork()
             }
         }
@@ -77,13 +79,44 @@ Item {
                     Layout.leftMargin: Theme.spacing
                     Layout.rightMargin: Theme.spacing
                     spacing: 8
+                    visible: isGame
+
+                    Button {
+                        text: qsTr("从 RAWG 搜索")
+                        Layout.fillWidth: true
+                        enabled: !importBusy
+                        onClicked: {
+                            rawgSearchDialog.initialKeyword = titleField.text
+                            rawgSearchDialog.open()
+                        }
+                    }
 
                     Button {
                         text: qsTr("从 Bangumi 搜索")
                         Layout.fillWidth: true
-                        enabled: !bgmClient.busy
+                        enabled: !importBusy
+                        flat: true
                         onClicked: {
-                            bangumiSearchDialog.section = root.section
+                            bangumiSearchDialog.section = "game"
+                            bangumiSearchDialog.initialKeyword = titleField.text
+                            bangumiSearchDialog.open()
+                        }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.spacing
+                    Layout.rightMargin: Theme.spacing
+                    spacing: 8
+                    visible: !isGame
+
+                    Button {
+                        text: qsTr("从 Bangumi 搜索")
+                        Layout.fillWidth: true
+                        enabled: !importBusy
+                        onClicked: {
+                            bangumiSearchDialog.section = "anime"
                             bangumiSearchDialog.initialKeyword = titleField.text
                             bangumiSearchDialog.open()
                         }
@@ -92,6 +125,19 @@ Item {
                     Label {
                         visible: bgmId > 0
                         text: qsTr("BGM #%1").arg(bgmId)
+                        font: Theme.captionFont
+                        color: Theme.accent
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.spacing
+                    Layout.rightMargin: Theme.spacing
+                    visible: isGame && bgmId > 0
+
+                    Label {
+                        text: qsTr("关联 ID #%1").arg(bgmId)
                         font: Theme.captionFont
                         color: Theme.accent
                     }
@@ -110,19 +156,15 @@ Item {
                         color: "#0a0c10"
                         clip: true
 
-                        Image {
-                            id: coverPreview
+                        CoverImage {
+                            id: coverPreviewDisplay
                             anchors.fill: parent
                             source: coverPathField.text ? "file:///" + coverPathField.text.replace(/\\/g, "/") : ""
-                            fillMode: Image.PreserveAspectFit
-                            horizontalAlignment: Image.AlignHCenter
-                            verticalAlignment: Image.AlignVCenter
-                            visible: coverPreview.status === Image.Ready
                         }
 
                         Label {
                             anchors.centerIn: parent
-                            visible: !coverPathField.text
+                            visible: !coverPathField.text || !coverPreviewDisplay.ready
                             text: qsTr("封面")
                             color: Theme.textSecondary
                         }
@@ -184,7 +226,9 @@ Item {
                             id: coverPathField
                             Layout.fillWidth: true
                             text: work.coverPath || ""
-                            placeholderText: qsTr("选择本地图片，或从 Bangumi 自动下载")
+                            placeholderText: isGame
+                                ? qsTr("选择本地图片，或从 RAWG / Bangumi 自动下载")
+                                : qsTr("选择本地图片，或从 Bangumi 自动下载")
                             color: Theme.textPrimary
                             background: Rectangle { radius: 8; color: Theme.surface; border.color: Theme.border }
                         }
@@ -225,9 +269,18 @@ Item {
 
     BangumiSearchDialog {
         id: bangumiSearchDialog
-        section: root.section
         onSubjectSelected: function(subjectId) {
-            bgmClient.importSubject(subjectId)
+            if (bangumiSearchDialog.section === "game")
+                gameBangumiClient.importSubject(subjectId)
+            else
+                bangumiClient.importSubject(subjectId)
+        }
+    }
+
+    RawgSearchDialog {
+        id: rawgSearchDialog
+        onGameSelected: function(gameId) {
+            rawgClient.importGame(gameId)
         }
     }
 
@@ -242,7 +295,7 @@ Item {
 
     Dialog {
         id: errorDialog
-        title: qsTr("Bangumi 错误")
+        title: qsTr("导入错误")
         modal: true
         anchors.centerIn: parent
         standardButtons: Dialog.Ok
@@ -252,24 +305,50 @@ Item {
 
     BusyIndicator {
         anchors.centerIn: parent
-        running: bgmClient.busy
+        running: importBusy
     }
 
     Connections {
-        target: bgmClient
+        target: bangumiClient
         function onImportFinished(data) {
-            titleField.text = data.title || ""
-            descField.text = data.description || ""
-            tagsField.text = (data.tags || []).join(", ")
-            coverPathField.text = data.coverPath || ""
-            if (data.score > 0)
-                scoreSpin.value = Math.round(data.score * 10)
-            bgmId = data.bgmId || 0
+            applyImportData(data)
         }
         function onErrorOccurred(message) {
             errorDialog.text = message
             errorDialog.open()
         }
+    }
+
+    Connections {
+        target: gameBangumiClient
+        function onImportFinished(data) {
+            applyImportData(data)
+        }
+        function onErrorOccurred(message) {
+            errorDialog.text = message
+            errorDialog.open()
+        }
+    }
+
+    Connections {
+        target: rawgClient
+        function onImportFinished(data) {
+            applyImportData(data)
+        }
+        function onErrorOccurred(message) {
+            errorDialog.text = message
+            errorDialog.open()
+        }
+    }
+
+    function applyImportData(data) {
+        titleField.text = data.title || ""
+        descField.text = data.description || ""
+        tagsField.text = (data.tags || []).join(", ")
+        coverPathField.text = data.coverPath || ""
+        if (data.score > 0)
+            scoreSpin.value = Math.round(data.score * 10)
+        bgmId = data.bgmId || 0
     }
 
     function saveWork() {

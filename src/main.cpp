@@ -5,6 +5,8 @@
 #include "GameController.h"
 #include "GameListModel.h"
 #include "GameReviewListModel.h"
+#include "MusicController.h"
+#include "RawgClient.h"
 #include "ReviewListModel.h"
 
 #include <QGuiApplication>
@@ -12,7 +14,35 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QSqlDatabase>
 #include <QStandardPaths>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
+namespace {
+
+void showStartupError(const QString &message)
+{
+    qCritical().noquote() << message;
+#ifdef Q_OS_WIN
+    MessageBoxW(nullptr, message.toStdWString().c_str(), L"EWR_Manager",
+                MB_OK | MB_ICONERROR);
+#else
+    fprintf(stderr, "%s\n", qPrintable(message));
+#endif
+}
+
+QString startupFailureHint()
+{
+    return QStringLiteral(
+        "\n\n若从 build 目录双击 exe 无界面，请先运行：\n"
+        "  powershell -ExecutionPolicy Bypass -File scripts\\deploy.ps1\n"
+        "或在 Qt Creator 中重新构建（会自动部署 Qt 运行时）。");
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -28,10 +58,21 @@ int main(int argc, char *argv[])
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     const QString dbPath = dataDir + QStringLiteral("/anime.db");
     const QString coversDir = dataDir + QStringLiteral("/covers");
+    const QString musicDir = dataDir + QStringLiteral("/music");
 
-    if (!DatabaseManager::instance().initialize(dbPath)) {
+    if (!QSqlDatabase::isDriverAvailable(QStringLiteral("QSQLITE"))) {
+        showStartupError(
+            QStringLiteral("SQLite 驱动不可用。请确认 exe 同目录存在 sqldrivers\\qsqlite.dll")
+            + startupFailureHint());
         return -1;
     }
+
+    if (!DatabaseManager::instance().initialize(dbPath)) {
+        showStartupError(QStringLiteral("无法打开数据库：\n%1").arg(dbPath));
+        return -1;
+    }
+
+    qInfo() << "Database:" << DatabaseManager::instance().databasePath();
 
     AnimeController animeController;
     animeController.seedSampleData();
@@ -46,6 +87,8 @@ int main(int argc, char *argv[])
 
     BangumiClient bangumiClient(coversDir, 2);
     BangumiClient gameBangumiClient(coversDir, 4);
+    RawgClient rawgClient(coversDir);
+    MusicController musicController(musicDir);
 
     QObject::connect(&bangumiClient, &BangumiClient::localSyncFinished, &animeController,
                      [&animeController, &animeModel](int localAnimeId, const QVariantMap &data) {
@@ -55,16 +98,7 @@ int main(int argc, char *argv[])
     QObject::connect(&bangumiClient, &BangumiClient::localSyncBatchFinished, &animeModel,
                      [&animeModel]() { animeModel.refresh(); });
 
-    QObject::connect(&gameBangumiClient, &BangumiClient::gameLocalSyncFinished, &gameController,
-                     [&gameController, &gameModel](int localGameId, const QVariantMap &data) {
-                         gameController.applyBangumiSync(localGameId, data);
-                         gameModel.refresh();
-                     });
-    QObject::connect(&gameBangumiClient, &BangumiClient::gameLocalSyncBatchFinished, &gameModel,
-                     [&gameModel]() { gameModel.refresh(); });
-
     animeController.syncPendingAnimeFromBangumi(&bangumiClient);
-    gameController.syncPendingGamesFromBangumi(&gameBangumiClient);
 
     QQmlApplicationEngine engine;
     engine.addImportPath(QStringLiteral("qrc:/qml"));
@@ -76,6 +110,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("gameReviewModel"), &gameReviewModel);
     engine.rootContext()->setContextProperty(QStringLiteral("bangumiClient"), &bangumiClient);
     engine.rootContext()->setContextProperty(QStringLiteral("gameBangumiClient"), &gameBangumiClient);
+    engine.rootContext()->setContextProperty(QStringLiteral("rawgClient"), &rawgClient);
+    engine.rootContext()->setContextProperty(QStringLiteral("musicController"), &musicController);
 
     const QUrl url(QStringLiteral("qrc:/qml/main.qml"));
     QObject::connect(
@@ -84,6 +120,8 @@ int main(int argc, char *argv[])
 
     engine.load(url);
     if (engine.rootObjects().isEmpty()) {
+        showStartupError(QStringLiteral("界面加载失败。请检查 Qt Quick 运行时是否已部署。")
+                        + startupFailureHint());
         return -1;
     }
 

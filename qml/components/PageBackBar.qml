@@ -18,6 +18,7 @@ Rectangle {
     color: Theme.surface
     border.color: Theme.borderLight
     border.width: 1
+    clip: true
 
     RowLayout {
         anchors.fill: parent
@@ -67,6 +68,7 @@ Rectangle {
         RowLayout {
             id: actionsLayout
             spacing: 8
+            Layout.alignment: Qt.AlignVCenter
         }
     }
 }

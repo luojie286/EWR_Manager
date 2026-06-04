@@ -10,9 +10,12 @@ Button {
     property string iconSource: ""
     property bool compact: false
 
-    implicitHeight: compact ? 32 : 36
-    implicitWidth: compact ? 32 : (contentRow.implicitWidth + 24)
-    padding: compact ? 0 : 10
+    implicitHeight: compact ? 32 : 38
+    implicitWidth: compact ? 32 : Math.max(contentRow.implicitWidth + leftPadding + rightPadding, 72)
+    topPadding: compact ? 0 : 8
+    bottomPadding: compact ? 0 : 8
+    leftPadding: compact ? 0 : 12
+    rightPadding: compact ? 0 : 12
 
     readonly property string resolvedIcon: {
         if (iconSource.length > 0)
@@ -49,10 +52,11 @@ Button {
     }
 
     background: Rectangle {
-        radius: compact ? 16 : Theme.radius
+        radius: compact ? 16 : Theme.radiusSmall
         color: fillColor
         border.color: borderColor
         border.width: 1.5
+        clip: true
 
         Behavior on color { ColorAnimation { duration: 120 } }
         Behavior on border.color { ColorAnimation { duration: 120 } }
@@ -61,13 +65,13 @@ Button {
     contentItem: RowLayout {
         id: contentRow
         spacing: compact ? 0 : 6
-        anchors.centerIn: parent
 
         Icon {
             visible: resolvedIcon.length > 0
             iconSource: resolvedIcon
-            size: compact ? Theme.iconSizeSmall : Theme.iconSize
+            size: compact ? Theme.iconSizeSmall : Theme.iconSizeSmall
             iconOpacity: 0.95
+            Layout.alignment: Qt.AlignVCenter
         }
 
         Text {
@@ -76,6 +80,7 @@ Button {
             font.pixelSize: Theme.bodyFont.pixelSize
             font.weight: Font.Medium
             color: labelColor
+            Layout.alignment: Qt.AlignVCenter
         }
     }
 }
